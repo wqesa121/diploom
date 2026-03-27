@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SelectMenu from "../components/ui/select-menu";
 
 type GroupOption = {
   _id: string;
@@ -134,22 +135,26 @@ export default function Register() {
           <label className="block mb-2 text-sm font-semibold text-slate-700">
             Группа
           </label>
-          <select
-            value={group}
-            onChange={(e) => setGroup(e.target.value)}
-            required
-            disabled={isGroupsLoading || groups.length === 0}
-            className="input-base mb-6"
-          >
-            <option value="">
-              {isGroupsLoading ? "Загрузка групп..." : "Выберите группу"}
-            </option>
-            {groups.map((item) => (
-              <option key={item._id} value={item._id}>
-                {item.name}{item.course?.title ? ` (${item.course.title})` : ""}
-              </option>
-            ))}
-          </select>
+          {isGroupsLoading ? (
+            <div className="input-base mb-6 text-slate-400">Загрузка групп...</div>
+          ) : groups.length > 0 ? (
+            <div className="mb-6">
+              <SelectMenu
+                value={group}
+                onChange={setGroup}
+                options={[
+                  { value: "", label: "Выберите группу" },
+                  ...groups.map((item) => ({
+                    value: item._id,
+                    label: `${item.name}${item.course?.title ? ` (${item.course.title})` : ""}`,
+                  })),
+                ]}
+                className="w-full"
+              />
+            </div>
+          ) : (
+            <div className="input-base mb-6 text-slate-400">Нет доступных групп</div>
+          )}
 
           {!isGroupsLoading && groups.length === 0 && (
             <p className="mb-4 text-sm text-amber-700 font-medium text-center bg-amber-50 rounded-xl py-2 px-3">
