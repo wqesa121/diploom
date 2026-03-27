@@ -158,12 +158,46 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   const [testBuilders, setTestBuilders] = useState<Record<string, TestQuestionDraft[]>>({});
   const [documentFiles, setDocumentFiles] = useState<Record<string, File | null>>({});
   const [openedTestAssignmentId, setOpenedTestAssignmentId] = useState<string | null>(null);
+  const [selectedGradeGroupId, setSelectedGradeGroupId] = useState("");
+  const [selectedGradeStudentId, setSelectedGradeStudentId] = useState("");
+  const [selectedGradeAssignmentId, setSelectedGradeAssignmentId] = useState("");
 
   const studentUsers = useMemo(() => users.filter((user) => user.role === "student"), [users]);
   const openedTestAssignment = useMemo(
     () => assignments.find((assignment) => assignment._id === openedTestAssignmentId && assignment.type === "TEST") || null,
     [assignments, openedTestAssignmentId]
   );
+  const studentsWithGrades = useMemo(() => {
+    const studentIdsWithRows = new Set(grades.map((row) => row.student?._id).filter(Boolean));
+    const byGroup = selectedGradeGroupId
+      ? studentUsers.filter((user) => {
+          const groupId = typeof user.group === "string" ? user.group : user.group?._id || "";
+          return groupId === selectedGradeGroupId;
+        })
+      : studentUsers;
+    return byGroup.filter((user) => studentIdsWithRows.has(user._id));
+  }, [grades, selectedGradeGroupId, studentUsers]);
+  const gradeAssignmentsForStudent = useMemo(() => {
+    if (!selectedGradeStudentId) return [] as Array<{ _id: string; title: string; type: string }>;
+    const unique = new Map<string, { _id: string; title: string; type: string }>();
+    for (const row of grades) {
+      if (row.student?._id !== selectedGradeStudentId || !row.assignment?._id) continue;
+      if (!unique.has(row.assignment._id)) {
+        unique.set(row.assignment._id, {
+          _id: row.assignment._id,
+          title: row.assignment.title || "Задание",
+          type: row.assignment.type || "-",
+        });
+      }
+    }
+    return Array.from(unique.values()).sort((a, b) => a.title.localeCompare(b.title, "ru"));
+  }, [grades, selectedGradeStudentId]);
+  const selectedGradeAttempts = useMemo(() => {
+    if (!selectedGradeStudentId || !selectedGradeAssignmentId) return [] as GradeRow[];
+    return grades
+      .filter((row) => row.student?._id === selectedGradeStudentId && row.assignment?._id === selectedGradeAssignmentId)
+      .sort((a, b) => (b.attempt || 0) - (a.attempt || 0));
+  }, [grades, selectedGradeStudentId, selectedGradeAssignmentId]);
 
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -245,6 +279,15 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
       setOpenedTestAssignmentId(null);
     }
   }, [assignments, openedTestAssignmentId]);
+
+  useEffect(() => {
+    setSelectedGradeStudentId("");
+    setSelectedGradeAssignmentId("");
+  }, [selectedGradeGroupId]);
+
+  useEffect(() => {
+    setSelectedGradeAssignmentId("");
+  }, [selectedGradeStudentId]);
 
   const createItem = async (url: string, body: object, successMessage: string, reset?: () => void) => {
     try {
@@ -880,7 +923,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
           {openedTestAssignment && (
             <div
-              className="fixed left-0 right-0 bottom-0 top-[72px] sm:top-[84px] z-[90] flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
+              className="fixed inset-0 z-[90] flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-6 pt-[82px] sm:pt-[96px] overflow-y-auto"
               onClick={() => setOpenedTestAssignmentId(null)}
             >
               <div
@@ -985,31 +1028,83 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
       {activeTab === "grades" && (
         <div className="space-y-4">
-          {grades.map((row) => (
-            <div key={row._id} className="card p-5 space-y-3">
-              <div>
-                <h4 className="font-bold text-slate-900">{row.assignment?.title || "Задание"}</h4>
-                <p className="text-sm text-slate-600">{row.student?.fullName || row.student?.username || "Студент"} · Попытка {row.attempt}</p>
-                <p className="text-xs text-slate-500">Статус: {row.status} · Текущий результат: {row.finalScore ?? 0}%</p>
-              </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <input
-                  className="input-base max-w-[140px]"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={scoreInputs[row._id] ?? ""}
-                  onChange={(e) => setScoreInputs((prev) => ({ ...prev, [row._id]: e.target.value }))}
-                />
-                <Button size="sm" onClick={() => saveGrade(row._id)}>Сохранить оценку</Button>
-                {row.assignment?.type === "TEST" && <Button size="sm" variant="secondary" onClick={() => recalcGrade(row._id)}>Пересчитать</Button>}
-                {row.assignment?._id && row.student?._id && (
-                  <Button size="sm" variant="outline" onClick={() => createRetake(row.assignment!._id, row.student!._id)}>Назначить повтор</Button>
-                )}
-              </div>
+          <div className="card p-5 space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">Навигация по оценкам</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <SelectMenu
+                value={selectedGradeGroupId}
+                options={[
+                  { value: "", label: "Выберите группу" },
+                  ...groups.map((group) => ({ value: group._id, label: group.name })),
+                ]}
+                onChange={setSelectedGradeGroupId}
+              />
+
+              <SelectMenu
+                value={selectedGradeStudentId}
+                options={[
+                  { value: "", label: "Выберите студента" },
+                  ...studentsWithGrades.map((student) => ({ value: student._id, label: student.fullName || student.username })),
+                ]}
+                onChange={setSelectedGradeStudentId}
+              />
+
+              <SelectMenu
+                value={selectedGradeAssignmentId}
+                options={[
+                  { value: "", label: "Выберите задание" },
+                  ...gradeAssignmentsForStudent.map((assignment) => ({ value: assignment._id, label: `${assignment.title} (${assignment.type})` })),
+                ]}
+                onChange={setSelectedGradeAssignmentId}
+              />
             </div>
-          ))}
+
+            {!selectedGradeGroupId && (
+              <p className="text-sm text-slate-500">Сначала выберите группу, затем студента и задание.</p>
+            )}
+            {selectedGradeGroupId && studentsWithGrades.length === 0 && (
+              <p className="text-sm text-slate-500">В выбранной группе пока нет студентов с попытками.</p>
+            )}
+            {selectedGradeStudentId && gradeAssignmentsForStudent.length === 0 && (
+              <p className="text-sm text-slate-500">У выбранного студента пока нет заданий с попытками.</p>
+            )}
+          </div>
+
+          {selectedGradeAssignmentId && (
+            <div className="space-y-4">
+              {selectedGradeAttempts.length === 0 ? (
+                <div className="card p-5">
+                  <p className="text-sm text-slate-500">По этому заданию пока нет попыток.</p>
+                </div>
+              ) : (
+                selectedGradeAttempts.map((row) => (
+                  <div key={row._id} className="card p-5 space-y-3">
+                    <div>
+                      <h4 className="font-bold text-slate-900">{row.assignment?.title || "Задание"}</h4>
+                      <p className="text-sm text-slate-600">{row.student?.fullName || row.student?.username || "Студент"} · Попытка {row.attempt}</p>
+                      <p className="text-xs text-slate-500">Статус: {row.status} · Текущий результат: {row.finalScore ?? 0}%</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <input
+                        className="input-base max-w-[140px]"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={scoreInputs[row._id] ?? ""}
+                        onChange={(e) => setScoreInputs((prev) => ({ ...prev, [row._id]: e.target.value }))}
+                      />
+                      <Button size="sm" onClick={() => saveGrade(row._id)}>Сохранить оценку</Button>
+                      {row.assignment?.type === "TEST" && <Button size="sm" variant="secondary" onClick={() => recalcGrade(row._id)}>Пересчитать</Button>}
+                      {row.assignment?._id && row.student?._id && (
+                        <Button size="sm" variant="outline" onClick={() => createRetake(row.assignment!._id, row.student!._id)}>Назначить повтор</Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
 

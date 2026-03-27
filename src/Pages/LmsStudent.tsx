@@ -80,6 +80,8 @@ export default function LmsStudent() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [working, setWorking] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [enteredAttemptView, setEnteredAttemptView] = useState(false);
 
   const selectedAssignmentSummary = useMemo(
     () => assignments.find((item) => item._id === selectedAssignmentId) || null,
@@ -87,7 +89,7 @@ export default function LmsStudent() {
   );
   const isAttemptActive = selectedAssignmentSummary?.status === "в процессе";
   const testQuestions = assignmentDetail?.questions || [];
-  const isFocusTestView = assignmentDetail?.type === "TEST" && isAttemptActive;
+  const isFocusTestView = assignmentDetail?.type === "TEST" && isAttemptActive && enteredAttemptView;
   const answeredQuestionsCount = useMemo(
     () => testQuestions.filter((question) => (answers[question._id] || []).length > 0).length,
     [testQuestions, answers]
@@ -195,6 +197,12 @@ export default function LmsStudent() {
   }, [selectedAssignmentId]);
 
   useEffect(() => {
+    if (!selectedAssignmentId) {
+      setEnteredAttemptView(false);
+    }
+  }, [selectedAssignmentId]);
+
+  useEffect(() => {
     if (!isAttemptActive) {
       setCurrentQuestionIndex(0);
     }
@@ -202,6 +210,14 @@ export default function LmsStudent() {
 
   const handleStart = async () => {
     if (!selectedAssignmentId) return;
+    const startedAssignmentId = selectedAssignmentId;
+
+    if (selectedAssignmentSummary?.status === "в процессе") {
+      setEnteredAttemptView(true);
+      setIsAssignmentModalOpen(false);
+      return;
+    }
+
     setWorking(true);
     try {
       const response = await fetch(`/api/student/assignments/${selectedAssignmentId}/start`, {
@@ -211,7 +227,11 @@ export default function LmsStudent() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Не удалось начать задание");
       toast.success(data.message || "Попытка начата");
+      setEnteredAttemptView(true);
+      setIsAssignmentModalOpen(false);
       await fetchAssignments(selectedThemeId);
+      setSelectedAssignmentId(startedAssignmentId);
+      await fetchAssignmentDetails(startedAssignmentId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Ошибка запуска задания");
     } finally {
@@ -431,7 +451,9 @@ export default function LmsStudent() {
                       key={assignment._id}
                       className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${selectedAssignmentId === assignment._id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-100 bg-slate-50 hover:bg-slate-100 text-slate-800"}`}
                       onClick={async () => {
+                        setEnteredAttemptView(false);
                         setSelectedAssignmentId(assignment._id);
+                        setIsAssignmentModalOpen(true);
                         await fetchAssignmentDetails(assignment._id);
                       }}
                     >
@@ -487,22 +509,12 @@ export default function LmsStudent() {
                     </div>
                     )}
 
-                    {!isFocusTestView && (
+                    {!isFocusTestView && selectedAssignmentSummary.latestSubmission && (
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        type="button"
-                        onClick={handleStart}
-                        disabled={working || selectedAssignmentSummary.status === "выполнено" || selectedAssignmentSummary.status === "просрочено"}
-                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {working ? "..." : "Начать попытку"}
-                      </button>
-                      {selectedAssignmentSummary.latestSubmission && (
-                        <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700 font-medium w-full sm:w-auto">
-                          Последняя попытка: {selectedAssignmentSummary.latestSubmission.attempt}
-                          {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Результат: ${selectedAssignmentSummary.latestSubmission.finalScore}%` : ""}
-                        </span>
-                      )}
+                      <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700 font-medium w-full sm:w-auto">
+                        Последняя попытка: {selectedAssignmentSummary.latestSubmission.attempt}
+                        {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Результат: ${selectedAssignmentSummary.latestSubmission.finalScore}%` : ""}
+                      </span>
                     </div>
                     )}
 
@@ -525,9 +537,6 @@ export default function LmsStudent() {
                                     Ответов: {answeredQuestionsCount} из {testQuestions.length}
                                   </p>
                                 </div>
-                                <span className="w-full sm:w-auto px-4 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 font-semibold text-sm text-center">
-                                  Фокус-режим включен до завершения теста
-                                </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
                                 <div
@@ -664,6 +673,46 @@ export default function LmsStudent() {
                 )}
               </div>
             </section>
+          </div>
+        )}
+
+        {isAssignmentModalOpen && selectedAssignmentSummary && (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+            onClick={() => setIsAssignmentModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">{selectedAssignmentSummary.title}</h3>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{selectedAssignmentSummary.type}</span>
+                </div>
+                <p className="text-sm text-slate-600">{selectedAssignmentSummary.description || "Без описания"}</p>
+                <p className="text-xs text-slate-500">Статус: {selectedAssignmentSummary.status}</p>
+                <p className="text-xs text-slate-500">Дедлайн: {new Date(selectedAssignmentSummary.deadline).toLocaleString("ru-RU")}</p>
+              </div>
+
+              <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignmentModalOpen(false)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  disabled={working || selectedAssignmentSummary.status === "выполнено" || selectedAssignmentSummary.status === "просрочено"}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {working ? "..." : selectedAssignmentSummary.status === "в процессе" ? "Продолжить попытку" : "Начать попытку"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
