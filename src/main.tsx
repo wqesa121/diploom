@@ -45,6 +45,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             } />
           </Routes>
         </main>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed bottom-3 right-3 z-40 select-none rounded-full border border-slate-200/70 bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wide text-slate-500 backdrop-blur-sm"
+        >
+          Student Circles Team
+        </div>
         <ToastContainer
           position="top-right"
           autoClose={4000}
