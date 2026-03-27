@@ -891,24 +891,26 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
           {openedTestAssignment && (
             <div
-              className="fixed inset-0 z-[70] bg-slate-900/45 backdrop-blur-sm"
+              className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
               onClick={() => setOpenedTestAssignmentId(null)}
             >
               <div
-                className="h-full w-full overflow-y-auto bg-slate-50"
+                className="relative w-full max-w-4xl my-auto rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-                  <div className="sticky top-0 z-10 -mx-2 sm:-mx-4 lg:-mx-6 mb-4 border-b border-slate-200 bg-slate-50/95 px-2 sm:px-4 lg:px-6 py-3 backdrop-blur">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg sm:text-2xl font-bold text-slate-900">{openedTestAssignment.title}</h3>
-                        <p className="text-sm text-slate-600">{openedTestAssignment.description || "Без описания"}</p>
-                        <p className="text-xs text-slate-500 mt-1">Полноэкранный редактор теста</p>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => setOpenedTestAssignmentId(null)}>Закрыть</Button>
+                <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                      <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base sm:text-lg font-bold text-slate-900">{openedTestAssignment.title}</h3>
+                      <p className="truncate text-xs text-slate-500">{openedTestAssignment.description || "Конструктор вопросов теста"}</p>
                     </div>
                   </div>
+                  <Button size="sm" variant="outline" onClick={() => setOpenedTestAssignmentId(null)}>✕ Закрыть</Button>
+                </div>
+                <div className="p-4 sm:p-6">
 
                   <div className="space-y-3">
                     <p className="text-sm font-semibold text-slate-700">Конструктор теста</p>
@@ -980,7 +982,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                       </div>
                     ))}
 
-                    <div className="flex flex-wrap gap-2 pt-1 pb-4">
+                    <div className="flex flex-wrap gap-2 pt-1 pb-2">
                       <Button size="sm" variant="secondary" onClick={() => addQuestion(openedTestAssignment._id)}>Добавить вопрос</Button>
                       <Button size="sm" onClick={() => saveTestQuestions(openedTestAssignment._id)}>Сохранить тест</Button>
                     </div>
