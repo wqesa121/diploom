@@ -42,6 +42,18 @@ type Assignment = {
   }>;
 };
 
+type TestOptionDraft = {
+  text: string;
+  isCorrect: boolean;
+};
+
+type TestQuestionDraft = {
+  text: string;
+  image?: string;
+  allowMultiple: boolean;
+  options: TestOptionDraft[];
+};
+
 type GradeRow = {
   _id: string;
   attempt: number;
@@ -113,6 +125,16 @@ const toIsoDateTime = (value: string) => {
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 };
 
+const createEmptyQuestion = (): TestQuestionDraft => ({
+  text: "",
+  image: "",
+  allowMultiple: false,
+  options: [
+    { text: "", isCorrect: false },
+    { text: "", isCorrect: false },
+  ],
+});
+
 export default function LmsPanel({ token, setError }: LmsPanelProps) {
   const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "groups" | "themes" | "categories" | "assignments" | "grades" | "students">("dashboard");
   const [loading, setLoading] = useState(true);
@@ -133,7 +155,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   const [assignmentForm, setAssignmentForm] = useState(emptyAssignmentForm);
 
   const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
-  const [questionDrafts, setQuestionDrafts] = useState<Record<string, string>>({});
+  const [testBuilders, setTestBuilders] = useState<Record<string, TestQuestionDraft[]>>({});
   const [documentFiles, setDocumentFiles] = useState<Record<string, File | null>>({});
 
   const studentUsers = useMemo(() => users.filter((user) => user.role === "student"), [users]);
@@ -180,13 +202,26 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
       setDashboard(dashboardData);
       setScoreInputs(Object.fromEntries((gradesData as GradeRow[]).map((row) => [row._id, String(row.finalScore ?? "")])));
 
-      setQuestionDrafts((prev) => {
+      setTestBuilders((prev) => {
         const next = { ...prev };
         for (const assignment of assignmentsData as Assignment[]) {
-          if (assignment.type === "TEST" && !next[assignment._id]) {
-            next[assignment._id] = JSON.stringify(assignment.questions || [], null, 2);
+          if (assignment.type !== "TEST") continue;
+          if (next[assignment._id]) continue;
+          const questions = (assignment.questions || []).map((q) => ({
+            text: q.text || "",
+            image: q.image || "",
+            allowMultiple: !!q.allowMultiple,
+            options: (q.options || []).map((o) => ({ text: o.text || "", isCorrect: !!o.isCorrect })),
+          }));
+          next[assignment._id] = questions.length > 0 ? questions : [createEmptyQuestion()];
+        }
+
+        for (const key of Object.keys(next)) {
+          if (!(assignmentsData as Assignment[]).some((a) => a._id === key && a.type === "TEST")) {
+            delete next[key];
           }
         }
+
         return next;
       });
     } catch (error) {
@@ -276,18 +311,125 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
     );
   };
 
+  const updateTestBuilder = (assignmentId: string, updater: (prev: TestQuestionDraft[]) => TestQuestionDraft[]) => {
+    setTestBuilders((prev) => ({
+      ...prev,
+      [assignmentId]: updater(prev[assignmentId] || [createEmptyQuestion()]),
+    }));
+  };
+
+  const addQuestion = (assignmentId: string) => {
+    updateTestBuilder(assignmentId, (prev) => [...prev, createEmptyQuestion()]);
+  };
+
+  const removeQuestion = (assignmentId: string, questionIndex: number) => {
+    updateTestBuilder(assignmentId, (prev) => {
+      const next = prev.filter((_, idx) => idx !== questionIndex);
+      return next.length > 0 ? next : [createEmptyQuestion()];
+    });
+  };
+
+  const setQuestionField = (assignmentId: string, questionIndex: number, field: "text" | "image", value: string) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, idx) => (idx === questionIndex ? { ...q, [field]: value } : q)));
+  };
+
+  const toggleAllowMultiple = (assignmentId: string, questionIndex: number, allowMultiple: boolean) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, idx) => {
+      if (idx !== questionIndex) return q;
+      if (allowMultiple) return { ...q, allowMultiple: true };
+      let seenCorrect = false;
+      const options = q.options.map((opt) => {
+        if (!opt.isCorrect) return opt;
+        if (!seenCorrect) {
+          seenCorrect = true;
+          return opt;
+        }
+        return { ...opt, isCorrect: false };
+      });
+      return { ...q, allowMultiple: false, options };
+    }));
+  };
+
+  const setOptionText = (assignmentId: string, questionIndex: number, optionIndex: number, text: string) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, qIdx) => {
+      if (qIdx !== questionIndex) return q;
+      return {
+        ...q,
+        options: q.options.map((opt, oIdx) => (oIdx === optionIndex ? { ...opt, text } : opt)),
+      };
+    }));
+  };
+
+  const toggleOptionCorrect = (assignmentId: string, questionIndex: number, optionIndex: number, checked: boolean) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, qIdx) => {
+      if (qIdx !== questionIndex) return q;
+      if (q.allowMultiple) {
+        return {
+          ...q,
+          options: q.options.map((opt, oIdx) => (oIdx === optionIndex ? { ...opt, isCorrect: checked } : opt)),
+        };
+      }
+      return {
+        ...q,
+        options: q.options.map((opt, oIdx) => ({ ...opt, isCorrect: oIdx === optionIndex ? checked : false })),
+      };
+    }));
+  };
+
+  const addOption = (assignmentId: string, questionIndex: number) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, qIdx) => {
+      if (qIdx !== questionIndex) return q;
+      return { ...q, options: [...q.options, { text: "", isCorrect: false }] };
+    }));
+  };
+
+  const removeOption = (assignmentId: string, questionIndex: number, optionIndex: number) => {
+    updateTestBuilder(assignmentId, (prev) => prev.map((q, qIdx) => {
+      if (qIdx !== questionIndex) return q;
+      const options = q.options.filter((_, idx) => idx !== optionIndex);
+      const safeOptions = options.length >= 2 ? options : [...options, { text: "", isCorrect: false }];
+      return { ...q, options: safeOptions };
+    }));
+  };
+
   const saveTestQuestions = async (assignmentId: string) => {
-    const raw = questionDrafts[assignmentId] || "[]";
-    try {
-      const questions = JSON.parse(raw);
-      if (!Array.isArray(questions)) {
-        toast.error("JSON вопросов должен быть массивом");
+    const questions = (testBuilders[assignmentId] || []).map((q) => ({
+      text: q.text.trim(),
+      image: q.image?.trim() || undefined,
+      allowMultiple: !!q.allowMultiple,
+      options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: !!o.isCorrect })),
+    }));
+
+    if (questions.length === 0) {
+      toast.error("Добавьте хотя бы один вопрос");
+      return;
+    }
+
+    for (let i = 0; i < questions.length; i += 1) {
+      const question = questions[i];
+      if (!question.text) {
+        toast.error(`Заполните текст вопроса #${i + 1}`);
         return;
       }
-      await updateItem(`/api/admin/assignments/${assignmentId}/test`, { questions }, "Тест обновлён");
-    } catch (_error) {
-      toast.error("Некорректный JSON вопросов");
+      if (!Array.isArray(question.options) || question.options.length < 2) {
+        toast.error(`В вопросе #${i + 1} должно быть минимум 2 варианта`);
+        return;
+      }
+      if (question.options.some((o) => !o.text)) {
+        toast.error(`Заполните все варианты вопроса #${i + 1}`);
+        return;
+      }
+      if (!question.options.some((o) => o.isCorrect)) {
+        toast.error(`Отметьте правильный ответ в вопросе #${i + 1}`);
+        return;
+      }
+      if (!question.allowMultiple && question.options.filter((o) => o.isCorrect).length > 1) {
+        toast.error(`Вопрос #${i + 1} допускает только один правильный ответ`);
+        return;
+      }
     }
+
+    await updateItem(`/api/admin/assignments/${assignmentId}/test`, { questions }, "Тест обновлён");
   };
 
   const uploadDocument = async (assignmentId: string) => {
@@ -664,14 +806,80 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                 </div>
 
                 {assignment.type === "TEST" && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-slate-700">Вопросы теста (JSON)</p>
-                    <textarea
-                      className="input-base min-h-40 font-mono text-xs"
-                      value={questionDrafts[assignment._id] || "[]"}
-                      onChange={(e) => setQuestionDrafts((prev) => ({ ...prev, [assignment._id]: e.target.value }))}
-                    />
-                    <Button size="sm" onClick={() => saveTestQuestions(assignment._id)}>Сохранить вопросы</Button>
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-slate-700">Конструктор теста</p>
+                    {(testBuilders[assignment._id] || [createEmptyQuestion()]).map((question, questionIndex) => (
+                      <div key={`${assignment._id}-q-${questionIndex}`} className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-800">Вопрос {questionIndex + 1}</p>
+                          <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => removeQuestion(assignment._id, questionIndex)}>
+                            Удалить вопрос
+                          </Button>
+                        </div>
+
+                        <input
+                          className="input-base"
+                          placeholder="Текст вопроса"
+                          value={question.text}
+                          onChange={(e) => setQuestionField(assignment._id, questionIndex, "text", e.target.value)}
+                        />
+
+                        <input
+                          className="input-base"
+                          placeholder="Ссылка на изображение (необязательно)"
+                          value={question.image || ""}
+                          onChange={(e) => setQuestionField(assignment._id, questionIndex, "image", e.target.value)}
+                        />
+
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={question.allowMultiple}
+                            onChange={(e) => toggleAllowMultiple(assignment._id, questionIndex, e.target.checked)}
+                          />
+                          Несколько правильных ответов
+                        </label>
+
+                        <div className="space-y-2">
+                          {question.options.map((option, optionIndex) => (
+                            <div key={`${assignment._id}-q-${questionIndex}-o-${optionIndex}`} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <input
+                                className="input-base flex-1"
+                                placeholder={`Вариант ${optionIndex + 1}`}
+                                value={option.text}
+                                onChange={(e) => setOptionText(assignment._id, questionIndex, optionIndex, e.target.value)}
+                              />
+                              <label className="inline-flex items-center gap-2 text-sm text-slate-700 whitespace-nowrap">
+                                <input
+                                  type={question.allowMultiple ? "checkbox" : "radio"}
+                                  name={`${assignment._id}-q-${questionIndex}-correct`}
+                                  checked={option.isCorrect}
+                                  onChange={(e) => toggleOptionCorrect(assignment._id, questionIndex, optionIndex, e.target.checked)}
+                                />
+                                Верный
+                              </label>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="!border-red-200 !text-red-600 hover:!bg-red-50"
+                                onClick={() => removeOption(assignment._id, questionIndex, optionIndex)}
+                              >
+                                Удалить
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Button size="sm" variant="secondary" onClick={() => addOption(assignment._id, questionIndex)}>
+                          Добавить вариант
+                        </Button>
+                      </div>
+                    ))}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => addQuestion(assignment._id)}>Добавить вопрос</Button>
+                      <Button size="sm" onClick={() => saveTestQuestions(assignment._id)}>Сохранить тест</Button>
+                    </div>
                   </div>
                 )}
 

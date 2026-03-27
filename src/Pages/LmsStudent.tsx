@@ -79,12 +79,21 @@ export default function LmsStudent() {
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [working, setWorking] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const selectedAssignmentSummary = useMemo(
     () => assignments.find((item) => item._id === selectedAssignmentId) || null,
     [assignments, selectedAssignmentId]
   );
   const isAttemptActive = selectedAssignmentSummary?.status === "в процессе";
+  const testQuestions = assignmentDetail?.questions || [];
+  const isFocusTestView = focusMode && assignmentDetail?.type === "TEST" && isAttemptActive;
+  const answeredQuestionsCount = useMemo(
+    () => testQuestions.filter((question) => (answers[question._id] || []).length > 0).length,
+    [testQuestions, answers]
+  );
+  const progressPercent = testQuestions.length > 0 ? Math.round((answeredQuestionsCount / testQuestions.length) * 100) : 0;
 
   const authHeaders = useMemo(
     () => ({ Authorization: `Bearer ${token}` }),
@@ -187,6 +196,18 @@ export default function LmsStudent() {
     fetchGrades();
   }, [token]);
 
+  useEffect(() => {
+    setCurrentQuestionIndex(0);
+    setFocusMode(false);
+  }, [selectedAssignmentId]);
+
+  useEffect(() => {
+    if (!isAttemptActive) {
+      setFocusMode(false);
+      setCurrentQuestionIndex(0);
+    }
+  }, [isAttemptActive]);
+
   const handleStart = async () => {
     if (!selectedAssignmentId) return;
     setWorking(true);
@@ -208,6 +229,10 @@ export default function LmsStudent() {
 
   const handleSingleChoice = (questionId: string, optionIndex: number) => {
     setAnswers((prev) => ({ ...prev, [questionId]: [optionIndex] }));
+  };
+
+  const autoAdvanceToNextQuestion = () => {
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, testQuestions.length - 1));
   };
 
   const handleMultipleChoice = (questionId: string, optionIndex: number, checked: boolean) => {
@@ -300,26 +325,26 @@ export default function LmsStudent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-12 space-y-6">
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 space-y-5 sm:space-y-6 page-entrance">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">LMS студента</h1>
-          <p className="mt-2 text-sm sm:text-base text-slate-600">Курсы, темы, задания, тесты и сдача работ в одном месте.</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">LMS студента</h1>
+          <p className="mt-2 text-sm sm:text-base text-slate-600 max-w-2xl">Курсы, темы, задания, тесты и сдача работ в одном месте.</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-4">
+        <div className="glass-panel p-1.5 inline-flex flex-wrap gap-1 border-b-0">
           <button
             onClick={() => setActiveTab("tasks")}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              activeTab === "tasks" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              activeTab === "tasks" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             Задания и тесты
           </button>
           <button
             onClick={() => setActiveTab("grades")}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              activeTab === "grades" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              activeTab === "grades" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             Мои оценки
@@ -370,8 +395,9 @@ export default function LmsStudent() {
             <p className="text-slate-600">У вас пока нет курса или не назначена учебная группа. Администратор должен назначить вас в группу.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-            <aside className="xl:col-span-4 space-y-5">
+          <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isFocusTestView ? "xl:grid-cols-1" : "xl:grid-cols-12"}`}>
+            {!isFocusTestView && (
+            <aside className="xl:col-span-4 space-y-4 sm:space-y-5 xl:sticky xl:top-24 xl:self-start">
               <div className="card p-5 space-y-3">
                 <h2 className="text-lg font-bold text-slate-900">Курсы</h2>
                 <SelectMenu
@@ -406,7 +432,7 @@ export default function LmsStudent() {
 
               <div className="card p-5 space-y-3">
                 <h2 className="text-lg font-bold text-slate-900">Задания и тесты</h2>
-                <div className="space-y-2 max-h-[300px] sm:max-h-[420px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[260px] sm:max-h-[420px] overflow-y-auto pr-1">
                   {assignments.length === 0 && <p className="text-sm text-slate-500">По теме пока нет активных заданий</p>}
                   {assignments.map((assignment) => (
                     <button
@@ -428,8 +454,9 @@ export default function LmsStudent() {
                 </div>
               </div>
             </aside>
+            )}
 
-            <section className="xl:col-span-8">
+            <section className={isFocusTestView ? "xl:col-span-1" : "xl:col-span-8"}>
               <div className="card p-4 sm:p-8 min-h-[420px] sm:min-h-[600px]">
                 {detailsLoading ? (
                   <div className="flex justify-center py-16">
@@ -439,6 +466,7 @@ export default function LmsStudent() {
                   <p className="text-slate-500">Выберите задание слева.</p>
                 ) : (
                   <div className="space-y-6">
+                    {!isFocusTestView && (
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-2">
@@ -457,7 +485,9 @@ export default function LmsStudent() {
                         <p className="text-xs text-slate-500">Дедлайн: {new Date(assignmentDetail.deadline).toLocaleString("ru-RU")}</p>
                       </div>
                     </div>
+                    )}
 
+                    {!isFocusTestView && (
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         type="button"
@@ -474,6 +504,7 @@ export default function LmsStudent() {
                         </span>
                       )}
                     </div>
+                    )}
 
                     {assignmentDetail.type === "TEST" && (
                       <div className="space-y-5">
@@ -486,33 +517,150 @@ export default function LmsStudent() {
                           </div>
                         ) : (
                           <>
-                            {(assignmentDetail.questions || []).map((question, questionIndex) => (
-                              <div key={question._id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5 space-y-3">
-                                <h3 className="font-bold text-slate-900">{questionIndex + 1}. {question.text}</h3>
-                                <div className="space-y-2">
-                                  {question.options.map((option, optionIndex) => {
-                                    const selected = (answers[question._id] || []).includes(optionIndex);
-                                    return (
-                                      <label key={optionIndex} className="flex items-center gap-3 rounded-xl bg-white px-3 sm:px-4 py-3 border border-slate-100 cursor-pointer hover:border-slate-200">
-                                        <input
-                                          type={question.allowMultiple ? "checkbox" : "radio"}
-                                          name={question._id}
-                                          checked={selected}
-                                          onChange={(event) => {
-                                            if (question.allowMultiple) {
-                                              handleMultipleChoice(question._id, optionIndex, event.target.checked);
-                                            } else {
-                                              handleSingleChoice(question._id, optionIndex);
-                                            }
-                                          }}
-                                        />
-                                        <span className="text-slate-800">{option.text}</span>
-                                      </label>
-                                    );
-                                  })}
+                            <div className="glass-panel border border-slate-200/70 p-4 sm:p-5 space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-700">Прогресс теста</p>
+                                  <p className="text-sm text-slate-500">
+                                    Ответов: {answeredQuestionsCount} из {testQuestions.length}
+                                  </p>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setFocusMode((prev) => !prev)}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:border-amber-300 hover:bg-amber-50/60 transition-all"
+                                >
+                                  {focusMode ? "Выйти из фокус-режима" : "Фокус на тест"}
+                                </button>
                               </div>
-                            ))}
+                              <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500 ease-out"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-slate-500">Выполнено: {progressPercent}%</p>
+                            </div>
+
+                            {focusMode ? (
+                              testQuestions.length === 0 ? (
+                                <p className="text-sm text-slate-500">В этом тесте пока нет вопросов.</p>
+                              ) : (
+                                <>
+                                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-6 space-y-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="text-sm font-semibold text-slate-600">Вопрос {currentQuestionIndex + 1} из {testQuestions.length}</p>
+                                      <span className="rounded-full bg-white border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                                        {(answers[testQuestions[currentQuestionIndex]?._id] || []).length > 0 ? "Ответ выбран" : "Ожидает ответ"}
+                                      </span>
+                                    </div>
+
+                                    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500 ease-out"
+                                        style={{ width: `${((currentQuestionIndex + 1) / testQuestions.length) * 100}%` }}
+                                      />
+                                    </div>
+
+                                    <p className="text-xs text-slate-500">
+                                      Автопереход включен для вопросов с одним правильным ответом.
+                                    </p>
+
+                                    <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                                      {currentQuestionIndex + 1}. {testQuestions[currentQuestionIndex]?.text}
+                                    </h3>
+
+                                    <div className="space-y-2">
+                                      {(testQuestions[currentQuestionIndex]?.options || []).map((option, optionIndex) => {
+                                        const question = testQuestions[currentQuestionIndex];
+                                        const selected = (answers[question._id] || []).includes(optionIndex);
+                                        return (
+                                          <label key={optionIndex} className={`answer-option ${selected ? "is-selected" : ""}`}>
+                                            <input
+                                              type={question.allowMultiple ? "checkbox" : "radio"}
+                                              name={question._id}
+                                              checked={selected}
+                                              className="sr-only"
+                                              onChange={(event) => {
+                                                if (question.allowMultiple) {
+                                                  handleMultipleChoice(question._id, optionIndex, event.target.checked);
+                                                } else {
+                                                  handleSingleChoice(question._id, optionIndex);
+                                                  if (currentQuestionIndex < testQuestions.length - 1) {
+                                                    setTimeout(() => {
+                                                      autoAdvanceToNextQuestion();
+                                                    }, 180);
+                                                  }
+                                                }
+                                              }}
+                                            />
+                                            <span className={`answer-option-control ${question.allowMultiple ? "checkbox" : "radio"}`} aria-hidden>
+                                              <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M5 10.5L8.5 14L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                              </svg>
+                                            </span>
+                                            <span className="text-slate-800">{option.text}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-between">
+                                      <button
+                                        type="button"
+                                        disabled={currentQuestionIndex === 0}
+                                        onClick={() => setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0))}
+                                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50"
+                                      >
+                                        Предыдущий
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={currentQuestionIndex === testQuestions.length - 1}
+                                        onClick={() => setCurrentQuestionIndex((prev) => Math.min(prev + 1, testQuestions.length - 1))}
+                                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50"
+                                      >
+                                        Следующий
+                                      </button>
+                                    </div>
+                                  </div>
+                                </>
+                              )
+                            ) : (
+                              testQuestions.map((question, questionIndex) => (
+                                <div key={question._id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5 space-y-3">
+                                  <h3 className="font-bold text-slate-900">{questionIndex + 1}. {question.text}</h3>
+                                  <div className="space-y-2">
+                                    {question.options.map((option, optionIndex) => {
+                                      const selected = (answers[question._id] || []).includes(optionIndex);
+                                      return (
+                                        <label key={optionIndex} className={`answer-option ${selected ? "is-selected" : ""}`}>
+                                          <input
+                                            type={question.allowMultiple ? "checkbox" : "radio"}
+                                            name={question._id}
+                                            checked={selected}
+                                            className="sr-only"
+                                            onChange={(event) => {
+                                              if (question.allowMultiple) {
+                                                handleMultipleChoice(question._id, optionIndex, event.target.checked);
+                                              } else {
+                                                handleSingleChoice(question._id, optionIndex);
+                                              }
+                                            }}
+                                          />
+                                          <span className={`answer-option-control ${question.allowMultiple ? "checkbox" : "radio"}`} aria-hidden>
+                                            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                              <path d="M5 10.5L8.5 14L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                          </span>
+                                          <span className="text-slate-800">{option.text}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))
+                            )}
                             <button
                               type="button"
                               onClick={handleSubmitTest}

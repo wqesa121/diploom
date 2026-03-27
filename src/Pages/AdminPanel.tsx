@@ -47,19 +47,19 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-10 page-entrance">
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Панель администратора
           </h1>
           <p className="mt-2 text-slate-600">
-            Управление кружками, записями и пользователями
+            Управление LMS: структура обучения, задания и пользователи
           </p>
         </div>
 
         <div className="mb-8">
-          <div className="flex flex-wrap gap-1 p-1 bg-white rounded-xl border border-slate-100 shadow-soft inline-flex">
+          <div className="glass-panel flex flex-wrap gap-1 p-1 shadow-soft inline-flex">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -76,7 +76,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-6 sm:p-8">
+        <div className="glass-panel shadow-soft p-4 sm:p-8">
           {activeTab === "lms" && (
             <LmsPanel token={token} setError={setError} />
           )}

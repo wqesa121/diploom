@@ -19,8 +19,12 @@
   }
 
   body {
-    @apply antialiased text-slate-900 bg-slate-50;
+    @apply antialiased text-slate-900;
     font-family: var(--font-sans);
+    background:
+      radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.12), transparent 42%),
+      radial-gradient(circle at 90% 0%, rgba(15, 23, 42, 0.06), transparent 30%),
+      linear-gradient(180deg, #f8fafc 0%, #f6f8fb 40%, #f8fafc 100%);
   }
 
   /* Focus ring for accessibility */
@@ -74,5 +78,60 @@
 
   .card-hover {
     @apply card hover:-translate-y-0.5;
+  }
+
+  .glass-panel {
+    @apply bg-white/85 backdrop-blur-xl border border-white/60 rounded-2xl;
+  }
+
+  .page-entrance {
+    animation: page-enter 420ms ease-out both;
+  }
+
+  .answer-option {
+    @apply relative flex items-center gap-3 rounded-xl bg-white px-3 sm:px-4 py-3 border border-slate-200 cursor-pointer transition-all duration-200;
+  }
+
+  .answer-option:hover {
+    @apply border-amber-300 shadow-sm;
+  }
+
+  .answer-option.is-selected {
+    @apply border-amber-500 bg-amber-50/70 shadow-sm;
+  }
+
+  .answer-option-control {
+    @apply flex h-5 w-5 shrink-0 items-center justify-center border-2 border-slate-300 bg-white transition-all duration-200;
+  }
+
+  .answer-option-control.radio {
+    @apply rounded-full;
+  }
+
+  .answer-option-control.checkbox {
+    @apply rounded-md;
+  }
+
+  .answer-option.is-selected .answer-option-control {
+    @apply border-amber-500 bg-amber-500;
+  }
+
+  .answer-option-control svg {
+    @apply h-3 w-3 text-white opacity-0 transition-opacity duration-150;
+  }
+
+  .answer-option.is-selected .answer-option-control svg {
+    @apply opacity-100;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

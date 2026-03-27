@@ -37,8 +37,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md page-entrance">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
             Вход в систему
@@ -50,7 +50,7 @@ export default function Login() {
 
         <form
           onSubmit={handleLogin}
-          className="bg-white rounded-2xl border border-slate-100 shadow-soft-lg p-8 sm:p-10"
+          className="glass-panel shadow-soft-lg p-6 sm:p-10"
         >
           <label className="block mb-2 text-sm font-semibold text-slate-700">
             Логин
