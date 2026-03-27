@@ -722,57 +722,62 @@ export default function LmsStudent() {
 
         {!isDesktop && isAssignmentModalOpen && selectedAssignmentSummary && (
           <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[90] flex items-end bg-slate-950/40"
             onClick={() => setIsAssignmentModalOpen(false)}
           >
             <div
-              className="w-full max-w-xl rounded-3xl border border-white/60 bg-white/96 p-5 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
-              onClick={(event) => event.stopPropagation()}
+              className="w-full rounded-t-3xl bg-white px-5 pt-4 pb-8 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900">{selectedAssignmentSummary.title}</h3>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{selectedAssignmentSummary.type}</span>
-                </div>
-                <p className="text-sm text-slate-600">{selectedAssignmentSummary.description || "Без описания"}</p>
-                <div className="space-y-1 text-sm text-slate-500">
-                  <p>Категория: {assignmentDetail?.category?.name || "-"}</p>
-                  <p>Тема: {assignmentDetail?.theme?.title || "-"}</p>
-                  <p>Статус: {selectedAssignmentSummary.status}</p>
-                </div>
+              <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200" />
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
-                  <p className="text-sm text-slate-500">Максимум</p>
-                  <p className="text-2xl font-bold text-slate-900">{assignmentDetail?.maxScore ?? selectedAssignmentSummary.maxScore}%</p>
-                  <p className="mt-3 text-xs text-slate-500">Начало: {new Date(assignmentDetail?.startAt || selectedAssignmentSummary.startAt).toLocaleString("ru-RU")}</p>
-                  <p className="text-xs text-slate-500">Дедлайн: {new Date(assignmentDetail?.deadline || selectedAssignmentSummary.deadline).toLocaleString("ru-RU")}</p>
-                </div>
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedAssignmentSummary.title}</h3>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">{selectedAssignmentSummary.type}</span>
+              </div>
 
-                {selectedAssignmentSummary.type === "TEST" && selectedAssignmentSummary.status !== "в процессе" && (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <h4 className="font-bold text-slate-900 mb-2">Тест не развернут</h4>
-                    <p className="text-sm text-slate-600">Нажмите кнопку "Начать попытку", чтобы открыть вопросы теста и приступить к выполнению.</p>
-                  </div>
+              {selectedAssignmentSummary.description && (
+                <p className="text-sm text-slate-500 mb-3">{selectedAssignmentSummary.description}</p>
+              )}
+
+              <div className="flex flex-wrap gap-2 mb-5">
+                {assignmentDetail?.category?.name && (
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600">{assignmentDetail.category.name}</span>
                 )}
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  selectedAssignmentSummary.status === "в процессе" ? "bg-amber-50 text-amber-600" :
+                  selectedAssignmentSummary.status === "выполнено" ? "bg-green-50 text-green-600" :
+                  selectedAssignmentSummary.status === "просрочено" ? "bg-red-50 text-red-500" :
+                  "bg-slate-100 text-slate-500"
+                }`}>{selectedAssignmentSummary.status}</span>
               </div>
 
-              <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAssignmentModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50"
-                >
-                  Закрыть
-                </button>
-                <button
-                  type="button"
-                  onClick={handleStart}
-                  disabled={working || selectedAssignmentSummary.status === "выполнено" || selectedAssignmentSummary.status === "просрочено"}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {working ? "..." : selectedAssignmentSummary.status === "в процессе" ? "Продолжить попытку" : "Начать попытку"}
-                </button>
+              <div className="rounded-2xl bg-slate-50 px-4 py-4 mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Максимум</p>
+                  <p className="text-3xl font-bold text-slate-900">{assignmentDetail?.maxScore ?? selectedAssignmentSummary.maxScore}%</p>
+                </div>
+                <div className="text-right text-xs text-slate-400 space-y-1">
+                  <p>Начало<br /><span className="text-slate-600 font-medium">{new Date(assignmentDetail?.startAt || selectedAssignmentSummary.startAt).toLocaleDateString("ru-RU")}</span></p>
+                  <p>Дедлайн<br /><span className="text-slate-600 font-medium">{new Date(assignmentDetail?.deadline || selectedAssignmentSummary.deadline).toLocaleDateString("ru-RU")}</span></p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleStart}
+                disabled={working || selectedAssignmentSummary.status === "выполнено" || selectedAssignmentSummary.status === "просрочено"}
+                className="w-full py-3.5 rounded-2xl bg-slate-900 text-white font-semibold text-base hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed mb-2"
+              >
+                {working ? "..." : selectedAssignmentSummary.status === "в процессе" ? "Продолжить попытку" : "Начать попытку"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAssignmentModalOpen(false)}
+                className="w-full py-2.5 rounded-2xl text-slate-400 font-medium text-sm hover:text-slate-600"
+              >
+                Закрыть
+              </button>
             </div>
           </div>
         )}
