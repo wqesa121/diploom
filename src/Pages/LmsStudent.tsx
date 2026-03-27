@@ -256,7 +256,7 @@ export default function LmsStudent() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Не удалось отправить тест");
-      toast.success(`Тест отправлен. Балл: ${data.submission.finalScore}`);
+      toast.success(`Тест отправлен. Результат: ${data.submission.finalScore ?? 0}%`);
       await fetchAssignments(selectedThemeId);
       await fetchAssignmentDetails(assignmentDetail._id);
       await fetchGrades();
@@ -363,15 +363,15 @@ export default function LmsStudent() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
                     <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 min-w-[120px]">
                       <p className="text-xs text-slate-500">Авто</p>
-                      <p className="text-lg font-bold text-slate-900">{row.autoScore ?? 0}</p>
+                      <p className="text-lg font-bold text-slate-900">{row.autoScore ?? 0}%</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 min-w-[120px]">
                       <p className="text-xs text-slate-500">Ручная</p>
-                      <p className="text-lg font-bold text-slate-900">{row.manualScore ?? "-"}</p>
+                      <p className="text-lg font-bold text-slate-900">{row.manualScore !== undefined ? `${row.manualScore}%` : "-"}</p>
                     </div>
                     <div className="rounded-xl bg-primary-50 border border-primary-100 px-4 py-3 min-w-[140px]">
                       <p className="text-xs text-primary-700">Итог</p>
-                      <p className="text-2xl font-bold text-primary-700">{row.finalScore ?? 0} / 100</p>
+                      <p className="text-2xl font-bold text-primary-700">{row.finalScore ?? 0}%</p>
                     </div>
                   </div>
                 </div>
@@ -479,8 +479,8 @@ export default function LmsStudent() {
                         <p className="text-sm text-slate-500">Статус: {selectedAssignmentSummary.status}</p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 w-full sm:w-auto sm:min-w-[220px]">
-                        <p className="text-sm text-slate-500">Максимум баллов</p>
-                        <p className="text-2xl font-bold text-slate-900">{assignmentDetail.maxScore}</p>
+                        <p className="text-sm text-slate-500">Максимум</p>
+                        <p className="text-2xl font-bold text-slate-900">{assignmentDetail.maxScore}%</p>
                         <p className="text-xs text-slate-500 mt-2">Начало: {new Date(assignmentDetail.startAt).toLocaleString("ru-RU")}</p>
                         <p className="text-xs text-slate-500">Дедлайн: {new Date(assignmentDetail.deadline).toLocaleString("ru-RU")}</p>
                       </div>
@@ -500,7 +500,7 @@ export default function LmsStudent() {
                       {selectedAssignmentSummary.latestSubmission && (
                         <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700 font-medium w-full sm:w-auto">
                           Последняя попытка: {selectedAssignmentSummary.latestSubmission.attempt}
-                          {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Балл: ${selectedAssignmentSummary.latestSubmission.finalScore}` : ""}
+                          {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Результат: ${selectedAssignmentSummary.latestSubmission.finalScore}%` : ""}
                         </span>
                       )}
                     </div>

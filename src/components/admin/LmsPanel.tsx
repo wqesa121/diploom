@@ -246,17 +246,6 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
     }
   }, [assignments, openedTestAssignmentId]);
 
-  useEffect(() => {
-    if (!openedTestAssignmentId) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [openedTestAssignmentId]);
-
   const createItem = async (url: string, body: object, successMessage: string, reset?: () => void) => {
     try {
       const response = await fetch(url, {
@@ -562,8 +551,8 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-5">
-              <p className="text-sm text-slate-500">Средний балл</p>
-              <p className="text-3xl font-bold text-slate-900">{dashboard.averageScore}</p>
+              <p className="text-sm text-slate-500">Средний результат</p>
+              <p className="text-3xl font-bold text-slate-900">{dashboard.averageScore}%</p>
             </div>
             <div className="card p-5">
               <p className="text-sm text-slate-500">Выполнено</p>
@@ -596,7 +585,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
               {dashboard.groupStats.map((group) => (
                 <div key={group.groupId} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex items-center justify-between gap-3">
                   <p className="font-semibold text-slate-900">{group.groupName}</p>
-                  <p className="text-sm text-slate-600">Студентов: {group.studentsCount} · Средний: {group.averageScore}</p>
+                  <p className="text-sm text-slate-600">Студентов: {group.studentsCount} · Средний: {group.averageScore}%</p>
                 </div>
               ))}
             </div>
@@ -608,10 +597,10 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
               {dashboard.studentGrades.map((row) => (
                 <div key={row.studentId} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                   <p className="font-semibold text-slate-900">{row.fullName} ({row.username})</p>
-                  <p className="text-sm text-slate-600">Группа: {row.groupName} · Средний балл: {row.averageScore}</p>
+                  <p className="text-sm text-slate-600">Группа: {row.groupName} · Средний результат: {row.averageScore}%</p>
                   <div className="mt-2 space-y-1">
                     {row.grades.slice(0, 5).map((grade) => (
-                      <p key={grade.submissionId} className="text-xs text-slate-500">{grade.assignmentTitle} ({grade.assignmentType}) · {grade.score}</p>
+                      <p key={grade.submissionId} className="text-xs text-slate-500">{grade.assignmentTitle} ({grade.assignmentType}) · {grade.score}%</p>
                     ))}
                   </div>
                 </div>
@@ -626,7 +615,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                 {dashboard.completedAssignmentsList.map((item) => (
                   <div key={item.submissionId} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                     <p className="font-semibold text-slate-900">{item.assignment?.title || "-"}</p>
-                    <p className="text-xs text-slate-500">{item.student?.fullName || item.student?.username || "-"} · {item.status} · Балл: {item.finalScore}</p>
+                    <p className="text-xs text-slate-500">{item.student?.fullName || item.student?.username || "-"} · {item.status} · Результат: {item.finalScore}%</p>
                   </div>
                 ))}
               </div>
@@ -807,7 +796,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                   <div>
                     <h4 className="font-bold text-slate-900">{assignment.title}</h4>
                     <p className="text-sm text-slate-600">{assignment.description || "Без описания"}</p>
-                    <p className="text-xs text-slate-500">Тип: {assignment.type} · Макс. балл: 100</p>
+                    <p className="text-xs text-slate-500">Тип: {assignment.type} · Максимум: 100%</p>
                     <p className="text-xs text-slate-500">Дедлайн: {new Date(assignment.deadline).toLocaleString("ru-RU")}</p>
                     {assignment.type === "TEST" && (
                       <p className="text-xs text-amber-700 mt-1">Нажмите на карточку, чтобы открыть содержимое теста</p>
@@ -891,11 +880,11 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
           {openedTestAssignment && (
             <div
-              className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
+              className="fixed left-0 right-0 bottom-0 top-[72px] sm:top-[84px] z-[90] flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
               onClick={() => setOpenedTestAssignmentId(null)}
             >
               <div
-                className="relative w-full max-w-4xl my-auto rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+                className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden mb-4"
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4 shadow-sm">
@@ -1001,7 +990,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
               <div>
                 <h4 className="font-bold text-slate-900">{row.assignment?.title || "Задание"}</h4>
                 <p className="text-sm text-slate-600">{row.student?.fullName || row.student?.username || "Студент"} · Попытка {row.attempt}</p>
-                <p className="text-xs text-slate-500">Статус: {row.status} · Текущий балл: {row.finalScore ?? 0}</p>
+                <p className="text-xs text-slate-500">Статус: {row.status} · Текущий результат: {row.finalScore ?? 0}%</p>
               </div>
               <div className="flex flex-wrap gap-2 items-center">
                 <input
@@ -1009,6 +998,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                   type="number"
                   min="0"
                   max="100"
+                  step="0.01"
                   value={scoreInputs[row._id] ?? ""}
                   onChange={(e) => setScoreInputs((prev) => ({ ...prev, [row._id]: e.target.value }))}
                 />

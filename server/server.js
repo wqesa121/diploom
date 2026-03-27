@@ -260,8 +260,9 @@ const calculateTestScore = (assignment, answers = []) => {
     }
   }
 
-  // По ТЗ: оценка = количество правильных ответов, максимум 100 баллов.
-  return Math.max(0, Math.min(100, correctCount));
+  // Оценка теста в процентах: доля правильных ответов от всех вопросов.
+  const percentScore = (correctCount / questions.length) * 100;
+  return Math.max(0, Math.min(100, Number(percentScore.toFixed(2))));
 };
 
 // ────────────────────────────────────────────────
