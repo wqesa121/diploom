@@ -959,7 +959,19 @@ app.get("/student/assignments/:id", authenticate, studentOnly, async (req, res) 
     if (String(assignment.group._id || assignment.group) !== String(req.user.group)) {
       return res.status(403).json({ message: "Нет доступа к заданию" });
     }
-    res.json(assignment);
+
+    const assignmentData = assignment.toObject();
+    assignmentData.questions = (assignmentData.questions || []).map((question) => {
+      const correctAnswersCount = (question.options || []).filter((option) => !!option.isCorrect).length;
+
+      return {
+        ...question,
+        allowMultiple: correctAnswersCount > 1,
+        options: (question.options || []).map((option) => ({ text: option.text })),
+      };
+    });
+
+    res.json(assignmentData);
   } catch (err) {
     console.error("Ошибка получения задания:", err);
     res.status(500).json({ message: "Ошибка загрузки задания" });

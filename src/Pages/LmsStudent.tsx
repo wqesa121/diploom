@@ -2,6 +2,8 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import SelectMenu from "../components/ui/select-menu";
 
+const DESKTOP_BREAKPOINT = "(min-width: 1024px)";
+
 type Course = { _id: string; title: string; description?: string };
 type Theme = { _id: string; title: string; description?: string };
 type AssignmentListItem = {
@@ -82,6 +84,10 @@ export default function LmsStudent() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [enteredAttemptView, setEnteredAttemptView] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(DESKTOP_BREAKPOINT).matches;
+  });
 
   const selectedAssignmentSummary = useMemo(
     () => assignments.find((item) => item._id === selectedAssignmentId) || null,
@@ -90,6 +96,7 @@ export default function LmsStudent() {
   const isAttemptActive = selectedAssignmentSummary?.status === "в процессе";
   const testQuestions = assignmentDetail?.questions || [];
   const isFocusTestView = assignmentDetail?.type === "TEST" && isAttemptActive && enteredAttemptView;
+  const showAssignmentWorkspace = isDesktop || enteredAttemptView;
   const answeredQuestionsCount = useMemo(
     () => testQuestions.filter((question) => (answers[question._id] || []).length > 0).length,
     [testQuestions, answers]
@@ -208,13 +215,32 @@ export default function LmsStudent() {
     }
   }, [isAttemptActive]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const mediaQuery = window.matchMedia(DESKTOP_BREAKPOINT);
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsDesktop(event.matches);
+      if (event.matches) {
+        setIsAssignmentModalOpen(false);
+      }
+    };
+
+    setIsDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
   const handleStart = async () => {
     if (!selectedAssignmentId) return;
     const startedAssignmentId = selectedAssignmentId;
 
     if (selectedAssignmentSummary?.status === "в процессе") {
       setEnteredAttemptView(true);
-      setIsAssignmentModalOpen(false);
+      if (!isDesktop) {
+        setIsAssignmentModalOpen(false);
+      }
       return;
     }
 
@@ -228,7 +254,9 @@ export default function LmsStudent() {
       if (!response.ok) throw new Error(data.message || "Не удалось начать задание");
       toast.success(data.message || "Попытка начата");
       setEnteredAttemptView(true);
-      setIsAssignmentModalOpen(false);
+      if (!isDesktop) {
+        setIsAssignmentModalOpen(false);
+      }
       await fetchAssignments(selectedThemeId);
       setSelectedAssignmentId(startedAssignmentId);
       await fetchAssignmentDetails(startedAssignmentId);
@@ -453,7 +481,9 @@ export default function LmsStudent() {
                       onClick={async () => {
                         setEnteredAttemptView(false);
                         setSelectedAssignmentId(assignment._id);
-                        setIsAssignmentModalOpen(true);
+                        if (!isDesktop) {
+                          setIsAssignmentModalOpen(true);
+                        }
                         await fetchAssignmentDetails(assignment._id);
                       }}
                     >
@@ -470,6 +500,7 @@ export default function LmsStudent() {
             </aside>
             )}
 
+            {showAssignmentWorkspace && (
             <section className={isFocusTestView ? "xl:col-span-1" : "xl:col-span-8"}>
               <div className="card p-4 sm:p-8 min-h-[420px] sm:min-h-[600px]">
                 {detailsLoading ? (
@@ -509,12 +540,24 @@ export default function LmsStudent() {
                     </div>
                     )}
 
-                    {!isFocusTestView && selectedAssignmentSummary.latestSubmission && (
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700 font-medium w-full sm:w-auto">
-                        Последняя попытка: {selectedAssignmentSummary.latestSubmission.attempt}
-                        {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Результат: ${selectedAssignmentSummary.latestSubmission.finalScore}%` : ""}
-                      </span>
+                    {!isFocusTestView && (
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={handleStart}
+                          disabled={working || selectedAssignmentSummary.status === "выполнено" || selectedAssignmentSummary.status === "просрочено"}
+                          className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-semibold transition-colors ${isDesktop ? "bg-slate-900 text-white hover:bg-slate-800" : "hidden"} disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {working ? "..." : selectedAssignmentSummary.status === "в процессе" ? "Продолжить задание" : "Начать задание"}
+                        </button>
+                        {selectedAssignmentSummary.latestSubmission && (
+                          <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700 font-medium w-full sm:w-auto">
+                            Последняя попытка: {selectedAssignmentSummary.latestSubmission.attempt}
+                            {selectedAssignmentSummary.latestSubmission.finalScore !== undefined ? ` · Результат: ${selectedAssignmentSummary.latestSubmission.finalScore}%` : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     )}
 
@@ -673,26 +716,44 @@ export default function LmsStudent() {
                 )}
               </div>
             </section>
+            )}
           </div>
         )}
 
-        {isAssignmentModalOpen && selectedAssignmentSummary && (
+        {!isDesktop && isAssignmentModalOpen && selectedAssignmentSummary && (
           <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4"
             onClick={() => setIsAssignmentModalOpen(false)}
           >
             <div
-              className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl"
+              className="w-full max-w-xl rounded-3xl border border-white/60 bg-white/96 p-5 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900">{selectedAssignmentSummary.title}</h3>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{selectedAssignmentSummary.type}</span>
                 </div>
                 <p className="text-sm text-slate-600">{selectedAssignmentSummary.description || "Без описания"}</p>
-                <p className="text-xs text-slate-500">Статус: {selectedAssignmentSummary.status}</p>
-                <p className="text-xs text-slate-500">Дедлайн: {new Date(selectedAssignmentSummary.deadline).toLocaleString("ru-RU")}</p>
+                <div className="space-y-1 text-sm text-slate-500">
+                  <p>Категория: {assignmentDetail?.category?.name || "-"}</p>
+                  <p>Тема: {assignmentDetail?.theme?.title || "-"}</p>
+                  <p>Статус: {selectedAssignmentSummary.status}</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+                  <p className="text-sm text-slate-500">Максимум</p>
+                  <p className="text-2xl font-bold text-slate-900">{assignmentDetail?.maxScore ?? selectedAssignmentSummary.maxScore}%</p>
+                  <p className="mt-3 text-xs text-slate-500">Начало: {new Date(assignmentDetail?.startAt || selectedAssignmentSummary.startAt).toLocaleString("ru-RU")}</p>
+                  <p className="text-xs text-slate-500">Дедлайн: {new Date(assignmentDetail?.deadline || selectedAssignmentSummary.deadline).toLocaleString("ru-RU")}</p>
+                </div>
+
+                {selectedAssignmentSummary.type === "TEST" && selectedAssignmentSummary.status !== "в процессе" && (
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <h4 className="font-bold text-slate-900 mb-2">Тест не развернут</h4>
+                    <p className="text-sm text-slate-600">Нажмите кнопку "Начать попытку", чтобы открыть вопросы теста и приступить к выполнению.</p>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
