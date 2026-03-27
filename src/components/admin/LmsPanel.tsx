@@ -5,13 +5,11 @@ import SelectMenu from "../ui/select-menu";
 
 type Course = { _id: string; title: string; description?: string };
 type Group = { _id: string; name: string; course?: { _id: string; title: string } | string };
-type Teacher = { _id: string; fullName?: string; username: string };
 type Theme = {
   _id: string;
   title: string;
   description?: string;
   course?: { _id: string; title: string } | string;
-  teacher?: { _id: string; fullName?: string; username: string } | string | null;
 };
 type Category = { _id: string; name: string };
 type User = {
@@ -22,12 +20,76 @@ type User = {
   role: string;
   group?: { _id: string; name: string } | string | null;
 };
+
+type Assignment = {
+  _id: string;
+  title: string;
+  description?: string;
+  type: "TEST" | "DOCUMENT";
+  startAt: string;
+  deadline: string;
+  maxScore: number;
+  theme?: { _id: string; title: string } | string;
+  group?: { _id: string; name: string } | string;
+  category?: { _id: string; name: string } | string;
+  documentFile?: string;
+  questions?: Array<{
+    _id?: string;
+    text: string;
+    image?: string;
+    allowMultiple?: boolean;
+    options: Array<{ text: string; isCorrect: boolean }>;
+  }>;
+};
+
+type GradeRow = {
+  _id: string;
+  attempt: number;
+  status: string;
+  autoScore?: number;
+  manualScore?: number;
+  finalScore?: number;
+  submittedAt?: string;
+  gradedAt?: string;
+  student?: { _id: string; fullName?: string; username: string; email?: string };
+  assignment?: { _id: string; title: string; type: string; maxScore: number; deadline?: string };
+};
+
 type DashboardData = {
   studentsLastLogin: Array<{ _id: string; fullName: string; username: string; lastLogin?: string; group?: { name: string } | string }>;
   completedAssignments: number;
   overdueAssignments: number;
   averageScore: number;
   groupStats: Array<{ groupId: string; groupName: string; studentsCount: number; averageScore: number }>;
+  studentGrades: Array<{
+    studentId: string;
+    fullName: string;
+    username: string;
+    groupName: string;
+    averageScore: number;
+    grades: Array<{
+      submissionId: string;
+      assignmentTitle: string;
+      assignmentType: string;
+      score: number;
+      gradedAt?: string;
+    }>;
+  }>;
+  completedAssignmentsList: Array<{
+    submissionId: string;
+    status: string;
+    finalScore: number;
+    updatedAt?: string;
+    student?: { _id: string; fullName?: string; username: string } | null;
+    assignment?: { _id: string; title: string; type: string; deadline?: string } | null;
+  }>;
+  overdueAssignmentsList: Array<{
+    submissionId: string;
+    status: string;
+    updatedAt?: string;
+    student?: { _id: string; fullName?: string; username: string } | null;
+    assignment?: { _id: string; title: string; type: string; deadline?: string } | null;
+  }>;
 };
 
 interface LmsPanelProps {
@@ -35,8 +97,24 @@ interface LmsPanelProps {
   setError: (error: string | null) => void;
 }
 
+const emptyAssignmentForm = {
+  title: "",
+  description: "",
+  theme: "",
+  group: "",
+  category: "",
+  type: "TEST" as "TEST" | "DOCUMENT",
+  startAt: "",
+  deadline: "",
+};
+
+const toIsoDateTime = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+};
+
 export default function LmsPanel({ token, setError }: LmsPanelProps) {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "groups" | "themes" | "categories" | "students">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "courses" | "groups" | "themes" | "categories" | "assignments" | "grades" | "students">("dashboard");
   const [loading, setLoading] = useState(true);
 
   const [courses, setCourses] = useState<Course[]>([]);
@@ -44,13 +122,19 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [grades, setGrades] = useState<GradeRow[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
   const [courseForm, setCourseForm] = useState({ title: "", description: "" });
   const [groupForm, setGroupForm] = useState({ name: "", course: "" });
-  const [themeForm, setThemeForm] = useState({ title: "", description: "", course: "", teacher: "" });
+  const [themeForm, setThemeForm] = useState({ title: "", description: "", course: "" });
   const [categoryForm, setCategoryForm] = useState({ name: "" });
+  const [assignmentForm, setAssignmentForm] = useState(emptyAssignmentForm);
+
+  const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
+  const [questionDrafts, setQuestionDrafts] = useState<Record<string, string>>({});
+  const [documentFiles, setDocumentFiles] = useState<Record<string, File | null>>({});
 
   const studentUsers = useMemo(() => users.filter((user) => user.role === "student"), [users]);
 
@@ -61,17 +145,18 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
     setLoading(true);
     try {
-      const [coursesRes, groupsRes, themesRes, categoriesRes, usersRes, teachersRes, dashboardRes] = await Promise.all([
+      const [coursesRes, groupsRes, themesRes, categoriesRes, usersRes, assignmentsRes, gradesRes, dashboardRes] = await Promise.all([
         fetch("/api/admin/courses", { headers: authHeaders }),
         fetch("/api/admin/groups", { headers: authHeaders }),
         fetch("/api/admin/themes", { headers: authHeaders }),
         fetch("/api/admin/categories", { headers: authHeaders }),
         fetch("/api/admin/users", { headers: authHeaders }),
-        fetch("/api/admin/teachers", { headers: authHeaders }),
+        fetch("/api/admin/assignments", { headers: authHeaders }),
+        fetch("/api/admin/grades", { headers: authHeaders }),
         fetch("/api/admin/dashboard-lms", { headers: authHeaders }),
       ]);
 
-      const responses = [coursesRes, groupsRes, themesRes, categoriesRes, usersRes, teachersRes, dashboardRes];
+      const responses = [coursesRes, groupsRes, themesRes, categoriesRes, usersRes, assignmentsRes, gradesRes, dashboardRes];
       for (const response of responses) {
         if (response.status === 401) {
           localStorage.removeItem("token");
@@ -81,7 +166,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
         }
       }
 
-      const [coursesData, groupsData, themesData, categoriesData, usersData, teachersData, dashboardData] = await Promise.all(
+      const [coursesData, groupsData, themesData, categoriesData, usersData, assignmentsData, gradesData, dashboardData] = await Promise.all(
         responses.map((response) => response.json())
       );
 
@@ -90,8 +175,20 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
       setThemes(themesData);
       setCategories(categoriesData);
       setUsers(usersData);
-      setTeachers(teachersData);
+      setAssignments(assignmentsData);
+      setGrades(gradesData);
       setDashboard(dashboardData);
+      setScoreInputs(Object.fromEntries((gradesData as GradeRow[]).map((row) => [row._id, String(row.finalScore ?? "")])));
+
+      setQuestionDrafts((prev) => {
+        const next = { ...prev };
+        for (const assignment of assignmentsData as Assignment[]) {
+          if (assignment.type === "TEST" && !next[assignment._id]) {
+            next[assignment._id] = JSON.stringify(assignment.questions || [], null, 2);
+          }
+        }
+        return next;
+      });
     } catch (error) {
       setError(error instanceof Error ? error.message : "Ошибка загрузки LMS данных");
     } finally {
@@ -158,12 +255,114 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
     }
   };
 
+  const createAssignment = async () => {
+    if (!assignmentForm.title.trim() || !assignmentForm.theme || !assignmentForm.group || !assignmentForm.category || !assignmentForm.startAt || !assignmentForm.deadline) {
+      toast.error("Заполните все обязательные поля задания");
+      return;
+    }
+
+    await createItem(
+      "/api/admin/assignments",
+      {
+        ...assignmentForm,
+        startAt: toIsoDateTime(assignmentForm.startAt),
+        deadline: toIsoDateTime(assignmentForm.deadline),
+        maxScore: 100,
+        questions: assignmentForm.type === "TEST" ? [] : undefined,
+        documentFile: undefined,
+      },
+      "Задание создано",
+      () => setAssignmentForm(emptyAssignmentForm)
+    );
+  };
+
+  const saveTestQuestions = async (assignmentId: string) => {
+    const raw = questionDrafts[assignmentId] || "[]";
+    try {
+      const questions = JSON.parse(raw);
+      if (!Array.isArray(questions)) {
+        toast.error("JSON вопросов должен быть массивом");
+        return;
+      }
+      await updateItem(`/api/admin/assignments/${assignmentId}/test`, { questions }, "Тест обновлён");
+    } catch (_error) {
+      toast.error("Некорректный JSON вопросов");
+    }
+  };
+
+  const uploadDocument = async (assignmentId: string) => {
+    const file = documentFiles[assignmentId];
+    if (!file) {
+      toast.error("Выберите файл задания");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/admin/assignments/${assignmentId}/document`, {
+        method: "POST",
+        headers: authHeaders,
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Ошибка загрузки файла");
+      toast.success("Файл задания загружен");
+      setDocumentFiles((prev) => ({ ...prev, [assignmentId]: null }));
+      fetchAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка загрузки файла");
+    }
+  };
+
+  const saveGrade = async (submissionId: string) => {
+    const raw = scoreInputs[submissionId];
+    const manualScore = Number(raw);
+    if (Number.isNaN(manualScore)) {
+      toast.error("Введите корректную оценку");
+      return;
+    }
+    await updateItem(`/api/admin/grades/${submissionId}`, { manualScore }, "Оценка обновлена");
+  };
+
+  const recalcGrade = async (submissionId: string) => {
+    try {
+      const response = await fetch(`/api/admin/grades/${submissionId}/recalculate`, {
+        method: "POST",
+        headers: authHeaders,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Ошибка пересчёта");
+      toast.success("Оценка пересчитана");
+      fetchAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка пересчёта");
+    }
+  };
+
+  const createRetake = async (assignmentId: string, studentId: string) => {
+    try {
+      const response = await fetch(`/api/admin/assignments/${assignmentId}/retake/${studentId}`, {
+        method: "POST",
+        headers: authHeaders,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Ошибка создания повторной попытки");
+      toast.success("Повторная попытка создана");
+      fetchAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ошибка повторной попытки");
+    }
+  };
+
   const tabs = [
     { id: "dashboard", label: "LMS Dashboard" },
     { id: "courses", label: "Курсы" },
     { id: "groups", label: "Группы" },
-    { id: "themes", label: "Темы + преподаватели" },
+    { id: "themes", label: "Темы" },
     { id: "categories", label: "Категории" },
+    { id: "assignments", label: "Задания и тесты" },
+    { id: "grades", label: "Оценки" },
     { id: "students", label: "Студенты по группам" },
   ] as const;
 
@@ -178,7 +377,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-        Админ управляет структурой LMS и привязками. Задания и оценки ведёт преподаватель в разделе "Мой LMS" (маршрут: /teacher-lms).
+        Админ управляет структурой LMS, заданиями, оценками и повторными попытками. Доступны только роли Админ и Студент.
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-4">
@@ -209,6 +408,76 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
             <div className="card p-5">
               <p className="text-sm text-slate-500">Просрочено</p>
               <p className="text-3xl font-bold text-slate-900">{dashboard.overdueAssignments}</p>
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-3">Последние входы студентов</h3>
+            <div className="space-y-2">
+              {dashboard.studentsLastLogin.slice(0, 20).map((student) => (
+                <div key={student._id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{student.fullName || student.username}</p>
+                    <p className="text-xs text-slate-500">Группа: {typeof student.group === "string" ? student.group : student.group?.name || "-"}</p>
+                  </div>
+                  <p className="text-xs text-slate-500">{student.lastLogin ? new Date(student.lastLogin).toLocaleString("ru-RU") : "ещё не входил"}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-3">Статистика по группам</h3>
+            <div className="space-y-2">
+              {dashboard.groupStats.map((group) => (
+                <div key={group.groupId} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex items-center justify-between gap-3">
+                  <p className="font-semibold text-slate-900">{group.groupName}</p>
+                  <p className="text-sm text-slate-600">Студентов: {group.studentsCount} · Средний: {group.averageScore}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-lg font-bold text-slate-900 mb-3">Оценки по студентам</h3>
+            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+              {dashboard.studentGrades.map((row) => (
+                <div key={row.studentId} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="font-semibold text-slate-900">{row.fullName} ({row.username})</p>
+                  <p className="text-sm text-slate-600">Группа: {row.groupName} · Средний балл: {row.averageScore}</p>
+                  <div className="mt-2 space-y-1">
+                    {row.grades.slice(0, 5).map((grade) => (
+                      <p key={grade.submissionId} className="text-xs text-slate-500">{grade.assignmentTitle} ({grade.assignmentType}) · {grade.score}</p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h3 className="text-lg font-bold text-slate-900 mb-3">Список выполненных заданий</h3>
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                {dashboard.completedAssignmentsList.map((item) => (
+                  <div key={item.submissionId} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="font-semibold text-slate-900">{item.assignment?.title || "-"}</p>
+                    <p className="text-xs text-slate-500">{item.student?.fullName || item.student?.username || "-"} · {item.status} · Балл: {item.finalScore}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <h3 className="text-lg font-bold text-slate-900 mb-3">Список просроченных заданий</h3>
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                {dashboard.overdueAssignmentsList.map((item) => (
+                  <div key={item.submissionId} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="font-semibold text-slate-900">{item.assignment?.title || "-"}</p>
+                    <p className="text-xs text-slate-500">{item.student?.fullName || item.student?.username || "-"} · {item.status}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -263,7 +532,16 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                   <h4 className="font-bold text-slate-900">{group.name}</h4>
                   <p className="text-sm text-slate-600">Курс: {typeof group.course === "string" ? group.course : group.course?.title || "-"}</p>
                 </div>
-                <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/groups/${group._id}`, "Группа удалена")}>Удалить</Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    const name = window.prompt("Название группы", group.name);
+                    if (!name) return;
+                    const currentCourseId = typeof group.course === "string" ? group.course : group.course?._id || "";
+                    const course = window.prompt("ID курса", currentCourseId) || currentCourseId;
+                    updateItem(`/api/admin/groups/${group._id}`, { name, course }, "Группа обновлена");
+                  }}>Изменить</Button>
+                  <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/groups/${group._id}`, "Группа удалена")}>Удалить</Button>
+                </div>
               </div>
             ))}
           </div>
@@ -281,30 +559,26 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
               options={[{ value: "", label: "Выберите курс" }, ...courses.map((course) => ({ value: course._id, label: course.title }))]}
               onChange={(value) => setThemeForm((prev) => ({ ...prev, course: value }))}
             />
-            <SelectMenu
-              value={themeForm.teacher}
-              options={[{ value: "", label: "Преподаватель не назначен" }, ...teachers.map((teacher) => ({ value: teacher._id, label: teacher.fullName || teacher.username }))]}
-              onChange={(value) => setThemeForm((prev) => ({ ...prev, teacher: value }))}
-            />
-            <Button onClick={() => createItem("/api/admin/themes", themeForm, "Тема создана", () => setThemeForm({ title: "", description: "", course: "", teacher: "" }))}>Создать тему</Button>
+            <Button onClick={() => createItem("/api/admin/themes", themeForm, "Тема создана", () => setThemeForm({ title: "", description: "", course: "" }))}>Создать тему</Button>
           </div>
           <div className="space-y-3">
             {themes.map((theme) => (
-              <div key={theme._id} className="card p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-slate-900">{theme.title}</h4>
-                    <p className="text-sm text-slate-600">{theme.description || "Без описания"}</p>
-                    <p className="text-xs text-slate-500">Курс: {typeof theme.course === "string" ? theme.course : theme.course?.title || "-"}</p>
-                    <p className="text-xs text-slate-500">Преподаватель: {typeof theme.teacher === "string" ? theme.teacher : theme.teacher?.fullName || theme.teacher?.username || "не назначен"}</p>
-                  </div>
+              <div key={theme._id} className="card p-5 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-slate-900">{theme.title}</h4>
+                  <p className="text-sm text-slate-600">{theme.description || "Без описания"}</p>
+                  <p className="text-xs text-slate-500">Курс: {typeof theme.course === "string" ? theme.course : theme.course?.title || "-"}</p>
                 </div>
-                <div className="mt-3 max-w-[260px]">
-                  <SelectMenu
-                    value={typeof theme.teacher === "string" ? theme.teacher : theme.teacher?._id || ""}
-                    options={[{ value: "", label: "Без преподавателя" }, ...teachers.map((teacher) => ({ value: teacher._id, label: teacher.fullName || teacher.username }))]}
-                    onChange={(value) => updateItem(`/api/admin/themes/${theme._id}`, { teacher: value || null }, "Преподаватель темы обновлён")}
-                  />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    const title = window.prompt("Название темы", theme.title);
+                    if (!title) return;
+                    const description = window.prompt("Описание", theme.description || "") ?? theme.description;
+                    const currentCourseId = typeof theme.course === "string" ? theme.course : theme.course?._id || "";
+                    const course = window.prompt("ID курса", currentCourseId) || currentCourseId;
+                    updateItem(`/api/admin/themes/${theme._id}`, { title, description, course }, "Тема обновлена");
+                  }}>Изменить</Button>
+                  <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/themes/${theme._id}`, "Тема удалена")}>Удалить</Button>
                 </div>
               </div>
             ))}
@@ -323,10 +597,134 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
             {categories.map((category) => (
               <div key={category._id} className="card p-5 flex items-center justify-between gap-3">
                 <h4 className="font-bold text-slate-900">{category.name}</h4>
-                <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/categories/${category._id}`, "Категория удалена")}>Удалить</Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    const name = window.prompt("Название категории", category.name);
+                    if (!name) return;
+                    updateItem(`/api/admin/categories/${category._id}`, { name }, "Категория обновлена");
+                  }}>Изменить</Button>
+                  <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/categories/${category._id}`, "Категория удалена")}>Удалить</Button>
+                </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === "assignments" && (
+        <div className="space-y-6">
+          <div className="card p-5 space-y-3">
+            <h3 className="text-lg font-bold text-slate-900">Создать задание</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <input className="input-base" placeholder="Название задания" value={assignmentForm.title} onChange={(e) => setAssignmentForm((prev) => ({ ...prev, title: e.target.value }))} />
+              <SelectMenu value={assignmentForm.type} options={[{ value: "TEST", label: "Тест" }, { value: "DOCUMENT", label: "Документ" }]} onChange={(value) => setAssignmentForm((prev) => ({ ...prev, type: value as "TEST" | "DOCUMENT" }))} />
+              <SelectMenu value={assignmentForm.theme} options={[{ value: "", label: "Тема" }, ...themes.map((theme) => ({ value: theme._id, label: theme.title }))]} onChange={(value) => setAssignmentForm((prev) => ({ ...prev, theme: value }))} />
+              <SelectMenu value={assignmentForm.group} options={[{ value: "", label: "Группа" }, ...groups.map((group) => ({ value: group._id, label: group.name }))]} onChange={(value) => setAssignmentForm((prev) => ({ ...prev, group: value }))} />
+              <SelectMenu value={assignmentForm.category} options={[{ value: "", label: "Категория" }, ...categories.map((category) => ({ value: category._id, label: category.name }))]} onChange={(value) => setAssignmentForm((prev) => ({ ...prev, category: value }))} />
+              <input className="input-base" type="datetime-local" value={assignmentForm.startAt} onChange={(e) => setAssignmentForm((prev) => ({ ...prev, startAt: e.target.value }))} />
+              <input className="input-base" type="datetime-local" value={assignmentForm.deadline} onChange={(e) => setAssignmentForm((prev) => ({ ...prev, deadline: e.target.value }))} />
+            </div>
+            <textarea className="input-base min-h-24" placeholder="Описание" value={assignmentForm.description} onChange={(e) => setAssignmentForm((prev) => ({ ...prev, description: e.target.value }))} />
+            <Button onClick={createAssignment}>Создать задание</Button>
+          </div>
+
+          <div className="space-y-4">
+            {assignments.map((assignment) => (
+              <div key={assignment._id} className="card p-5 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900">{assignment.title}</h4>
+                    <p className="text-sm text-slate-600">{assignment.description || "Без описания"}</p>
+                    <p className="text-xs text-slate-500">Тип: {assignment.type} · Макс. балл: 100</p>
+                    <p className="text-xs text-slate-500">Дедлайн: {new Date(assignment.deadline).toLocaleString("ru-RU")}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => {
+                      const title = window.prompt("Название задания", assignment.title);
+                      if (!title) return;
+                      const description = window.prompt("Описание", assignment.description || "") ?? assignment.description;
+                      const startAt = window.prompt("Дата начала (ISO)", assignment.startAt) || assignment.startAt;
+                      const deadline = window.prompt("Дедлайн (ISO)", assignment.deadline) || assignment.deadline;
+                      const theme = typeof assignment.theme === "string" ? assignment.theme : assignment.theme?._id || "";
+                      const group = typeof assignment.group === "string" ? assignment.group : assignment.group?._id || "";
+                      const category = typeof assignment.category === "string" ? assignment.category : assignment.category?._id || "";
+                      updateItem(`/api/admin/assignments/${assignment._id}`, {
+                        title,
+                        description,
+                        startAt: toIsoDateTime(startAt),
+                        deadline: toIsoDateTime(deadline),
+                        theme,
+                        group,
+                        category,
+                        type: assignment.type,
+                      }, "Задание обновлено");
+                    }}>Изменить</Button>
+                    <Button size="sm" variant="outline" className="!border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => deleteItem(`/api/admin/assignments/${assignment._id}`, "Задание удалено")}>Удалить</Button>
+                  </div>
+                </div>
+
+                {assignment.type === "TEST" && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-700">Вопросы теста (JSON)</p>
+                    <textarea
+                      className="input-base min-h-40 font-mono text-xs"
+                      value={questionDrafts[assignment._id] || "[]"}
+                      onChange={(e) => setQuestionDrafts((prev) => ({ ...prev, [assignment._id]: e.target.value }))}
+                    />
+                    <Button size="sm" onClick={() => saveTestQuestions(assignment._id)}>Сохранить вопросы</Button>
+                  </div>
+                )}
+
+                {assignment.type === "DOCUMENT" && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-700">Файл задания</p>
+                    {assignment.documentFile ? (
+                      <a href={assignment.documentFile} target="_blank" rel="noreferrer" className="text-sm text-primary-600 hover:text-primary-700 font-semibold">
+                        Текущий файл задания
+                      </a>
+                    ) : (
+                      <p className="text-xs text-slate-500">Файл еще не загружен</p>
+                    )}
+                    <input
+                      type="file"
+                      onChange={(e) => setDocumentFiles((prev) => ({ ...prev, [assignment._id]: e.target.files?.[0] || null }))}
+                      className="block text-sm text-slate-700"
+                    />
+                    <Button size="sm" onClick={() => uploadDocument(assignment._id)}>Загрузить файл задания</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "grades" && (
+        <div className="space-y-4">
+          {grades.map((row) => (
+            <div key={row._id} className="card p-5 space-y-3">
+              <div>
+                <h4 className="font-bold text-slate-900">{row.assignment?.title || "Задание"}</h4>
+                <p className="text-sm text-slate-600">{row.student?.fullName || row.student?.username || "Студент"} · Попытка {row.attempt}</p>
+                <p className="text-xs text-slate-500">Статус: {row.status} · Текущий балл: {row.finalScore ?? 0}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  className="input-base max-w-[140px]"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={scoreInputs[row._id] ?? ""}
+                  onChange={(e) => setScoreInputs((prev) => ({ ...prev, [row._id]: e.target.value }))}
+                />
+                <Button size="sm" onClick={() => saveGrade(row._id)}>Сохранить оценку</Button>
+                {row.assignment?.type === "TEST" && <Button size="sm" variant="secondary" onClick={() => recalcGrade(row._id)}>Пересчитать</Button>}
+                {row.assignment?._id && row.student?._id && (
+                  <Button size="sm" variant="outline" onClick={() => createRetake(row.assignment!._id, row.student!._id)}>Назначить повтор</Button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

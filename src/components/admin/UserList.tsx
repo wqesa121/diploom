@@ -8,7 +8,7 @@ interface User {
   fullName: string;
   email?: string;
   phone?: string;
-  role: "student" | "admin" | "teacher";
+  role: "student" | "admin";
   createdAt: string;
 }
 
@@ -23,7 +23,6 @@ export default function UserList({ token, setError }: UserListProps) {
 
   const roleOptions = [
     { value: "student", label: "Участник" },
-    { value: "teacher", label: "Преподаватель" },
     { value: "admin", label: "Админ" },
   ];
 
@@ -63,7 +62,7 @@ export default function UserList({ token, setError }: UserListProps) {
     fetchUsers();
   }, [token, setError]);
 
-  const changeRole = async (userId: string, role: "student" | "admin" | "teacher") => {
+  const changeRole = async (userId: string, role: "student" | "admin") => {
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: "PUT",
@@ -138,19 +137,17 @@ export default function UserList({ token, setError }: UserListProps) {
                       className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${
                         user.role === "admin"
                           ? "bg-primary-100 text-primary-800"
-                          : user.role === "teacher"
-                          ? "bg-emerald-100 text-emerald-800"
                           : "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {user.role === "admin" ? "Админ" : user.role === "teacher" ? "Преподаватель" : "Участник"}
+                      {user.role === "admin" ? "Админ" : "Участник"}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <SelectMenu
                       value={user.role}
                       options={roleOptions}
-                      onChange={(value) => changeRole(user._id, value as "student" | "admin" | "teacher")}
+                      onChange={(value) => changeRole(user._id, value as "student" | "admin")}
                       className="max-w-[190px]"
                     />
                   </td>

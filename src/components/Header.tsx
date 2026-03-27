@@ -5,7 +5,6 @@ export default function Header() {
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user.role === "admin";
-  const isTeacher = user.role === "teacher";
   const isStudent = user.role === "student";
 
   const handleLogout = () => {
@@ -30,45 +29,12 @@ export default function Header() {
         <nav className="flex items-center gap-1 sm:gap-2">
           {token ? (
             <>
-              <Link to="/" className={`px-3 py-2 rounded-lg ${navLink}`}>
-                Главная
-              </Link>
-              <Link
-                to="/my-enrollments"
-                className={`px-3 py-2 rounded-lg ${navLink}`}
-              >
-                Мои записи
-              </Link>
               {isStudent && (
-                <>
-                  <Link
-                    to="/lms"
-                    className={`px-3 py-2 rounded-lg ${navLink}`}
-                  >
-                    LMS
-                  </Link>
-                  <Link
-                    to="/grades"
-                    className={`px-3 py-2 rounded-lg ${navLink}`}
-                  >
-                    Оценки
-                  </Link>
-                </>
-              )}
-              {isTeacher && (
                 <Link
-                  to="/teacher-lms"
-                  className="px-3 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 font-semibold transition-colors duration-200"
-                >
-                  Мой LMS
-                </Link>
-              )}
-              {(isTeacher || isAdmin) && (
-                <Link
-                  to="/my-circles"
+                  to="/lms"
                   className={`px-3 py-2 rounded-lg ${navLink}`}
                 >
-                  Мои кружки
+                  LMS
                 </Link>
               )}
               {isAdmin && (

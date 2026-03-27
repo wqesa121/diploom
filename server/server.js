@@ -11,7 +11,16 @@ import { fileURLToPath } from "url";
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
-const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/student_circles_db";
+const isProduction = process.env.NODE_ENV === "production";
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/student_circles_db";
+
+if (!process.env.MONGODB_URI && !isProduction) {
+  console.warn("[config] MONGODB_URI не задан, используется локальная MongoDB");
+}
+
+if (!process.env.MONGODB_URI && isProduction) {
+  throw new Error("MONGODB_URI обязателен в production");
+}
 
 app.use((req, _res, next) => {
   if (req.url === "/api") {
@@ -60,7 +69,15 @@ mongoose
   .then(() => console.log("✅ MongoDB подключена"))
   .catch((err) => console.error("❌ Ошибка MongoDB:", err));
 
-const JWT_SECRET = process.env.JWT_SECRET || "pXT3UQ9xhdEXSQe3UXgQUaumsJzxcf10gGSVf5xZ51rVPYu6ha";
+const JWT_SECRET = process.env.JWT_SECRET || "dev_jwt_secret_change_me";
+
+if (!process.env.JWT_SECRET && !isProduction) {
+  console.warn("[config] JWT_SECRET не задан, используется dev secret");
+}
+
+if (!process.env.JWT_SECRET && isProduction) {
+  throw new Error("JWT_SECRET обязателен в production");
+}
 
 // ────────────────────────────────────────────────
 // МОДЕЛИ
@@ -91,58 +108,6 @@ userSchema.methods.comparePassword = async function (candidate) {
 
 const User = mongoose.model("User", userSchema);
 
-const circleSchema = new mongoose.Schema({
-  title: { type: String, required: true, trim: true },
-  description: { type: String, trim: true },
-  category: { type: String, trim: true },
-  maxPlaces: { type: Number, required: true, min: 1 },
-  currentPlaces: { type: Number, default: 0 },
-  price: { type: Number, default: 0 },
-  schedule: { type: String, trim: true },
-  imageUrl: { type: String },
-    teacher: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  isActive: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now },
-});
-
-const Circle = mongoose.model("Circle", circleSchema);
-
-const messageSchema = new mongoose.Schema({
-  circle: { type: mongoose.Schema.Types.ObjectId, ref: "Circle", required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  content: { type: String, required: true, trim: true },
-  createdAt: { type: Date, default: Date.now },
-});
-
-messageSchema.index({ circle: 1, createdAt: 1 });
-const Message = mongoose.model("Message", messageSchema);
-
-const userCircleLastReadSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  circle: { type: mongoose.Schema.Types.ObjectId, ref: "Circle", required: true },
-  lastReadAt: { type: Date, default: Date.now },
-}, { timestamps: true });
-userCircleLastReadSchema.index({ user: 1, circle: 1 }, { unique: true });
-const UserCircleLastRead = mongoose.model("UserCircleLastRead", userCircleLastReadSchema);
-
-const enrollmentSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  circle: { type: mongoose.Schema.Types.ObjectId, ref: "Circle", required: true },
-  status: {
-    type: String,
-    enum: ["pending", "approved", "rejected", "cancelled"],
-    default: "pending",
-  },
-  comment: { type: String, trim: true },
-  rejectionReason: { type: String, trim: true },
-  rejectedAs: { type: String, enum: ["application", "removed_from_circle"] },
-  createdAt: { type: Date, default: Date.now },
-}, { timestamps: true });
-
-enrollmentSchema.index({ user: 1, circle: 1 }, { unique: true });
-
-const Enrollment = mongoose.model("Enrollment", enrollmentSchema);
-
 const courseSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
@@ -161,7 +126,6 @@ const themeSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
   title: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
-    teacher: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   createdAt: { type: Date, default: Date.now },
 });
 const Theme = mongoose.model("Theme", themeSchema);
@@ -265,13 +229,6 @@ const studentOnly = (req, res, next) => {
   next();
 };
 
-const teacherOnly = (req, res, next) => {
-  if (req.user.role !== "teacher") {
-    return res.status(403).json({ message: "Доступ только для преподавателя" });
-  }
-  next();
-};
-
 const isAfterDeadline = (assignment) => {
   const now = new Date();
   return new Date(assignment.deadline).getTime() < now.getTime();
@@ -303,8 +260,8 @@ const calculateTestScore = (assignment, answers = []) => {
     }
   }
 
-  const score = Math.round((correctCount / questions.length) * assignment.maxScore);
-  return Math.max(0, Math.min(assignment.maxScore, score));
+  // По ТЗ: оценка = количество правильных ответов, максимум 100 баллов.
+  return Math.max(0, Math.min(100, correctCount));
 };
 
 // ────────────────────────────────────────────────
@@ -436,275 +393,6 @@ app.put("/profile", authenticate, async (req, res) => {
 
 // ──── Студент ────
 
-app.get("/circles", async (req, res) => {
-  try {
-    const circles = await Circle.find({ isActive: true }).select("-__v -createdAt");
-    res.json(circles);
-  } catch (err) {
-    console.error("Ошибка /circles:", err);
-    res.status(500).json({ message: "Не удалось загрузить кружки" });
-  }
-});
-
-// Сообщения чата кружка (доступ: студент с одобренной заявкой, преподаватель кружка, админ)
-app.get("/circles/:id/messages", authenticate, async (req, res) => {
-  try {
-    const circle = await Circle.findById(req.params.id);
-    if (!circle) return res.status(404).json({ message: "Кружок не найден" });
-
-    const isAdmin = req.user.role === "admin";
-    const isTeacher = circle.teacher && circle.teacher.toString() === req.user._id.toString();
-    const isEnrolled = await Enrollment.findOne({
-      user: req.user._id,
-      circle: req.params.id,
-      status: "approved",
-    });
-    if (!isAdmin && !isTeacher && !isEnrolled) {
-      return res.status(403).json({ message: "Нет доступа к чату этого кружка" });
-    }
-
-    const messages = await Message.find({ circle: req.params.id })
-      .populate("user", "fullName username")
-      .sort({ createdAt: 1 })
-      .lean();
-    const latest = messages.length > 0 ? messages[messages.length - 1].createdAt : null;
-    if (latest) {
-      await UserCircleLastRead.findOneAndUpdate(
-        { user: req.user._id, circle: req.params.id },
-        { lastReadAt: latest },
-        { upsert: true }
-      );
-    }
-    res.json(messages);
-  } catch (err) {
-    console.error("Ошибка /circles/:id/messages:", err);
-    res.status(500).json({ message: "Ошибка загрузки сообщений" });
-  }
-});
-
-// Отправить сообщение в чат кружка (только преподаватель кружка или админ)
-app.post("/circles/:id/messages", authenticate, async (req, res) => {
-  try {
-    const { content } = req.body;
-    if (!content || typeof content !== "string" || !content.trim()) {
-      return res.status(400).json({ message: "Текст сообщения обязателен" });
-    }
-
-    const circle = await Circle.findById(req.params.id);
-    if (!circle) return res.status(404).json({ message: "Кружок не найден" });
-
-    const isAdmin = req.user.role === "admin";
-    const isTeacher = circle.teacher && circle.teacher.toString() === req.user._id.toString();
-    if (!isAdmin && !isTeacher) {
-      return res.status(403).json({ message: "Только преподаватель кружка может писать в чат" });
-    }
-
-    const message = await Message.create({
-      circle: req.params.id,
-      user: req.user._id,
-      content: content.trim(),
-    });
-    const populated = await Message.findById(message._id)
-      .populate("user", "fullName username")
-      .lean();
-    res.status(201).json(populated);
-  } catch (err) {
-    console.error("Ошибка POST /circles/:id/messages:", err);
-    res.status(500).json({ message: "Ошибка отправки сообщения" });
-  }
-});
-
-app.get("/circles/:id", async (req, res) => {
-  try {
-    const circle = await Circle.findById(req.params.id).populate("teacher", "fullName username");
-    if (!circle) return res.status(404).json({ message: "Кружок не найден" });
-    res.json(circle);
-  } catch (err) {
-    console.error("Ошибка /circles/:id:", err);
-    res.status(500).json({ message: "Ошибка" });
-  }
-});
-
-app.post("/enroll", authenticate, async (req, res) => {
-  try {
-    const { circleId, comment } = req.body;
-
-    const circle = await Circle.findById(circleId);
-    if (!circle || !circle.isActive) {
-      return res.status(404).json({ message: "Кружок не найден или закрыт" });
-    }
-
-    if (circle.currentPlaces >= circle.maxPlaces) {
-      return res.status(409).json({ message: "Все места заняты" });
-    }
-
-    const existing = await Enrollment.findOne({ user: req.user._id, circle: circleId });
-    if (existing) {
-      if (existing.status === "approved" || existing.status === "pending") {
-        return res.status(409).json({ message: "Вы уже записаны на этот кружок или заявка на рассмотрении" });
-      }
-      existing.status = "pending";
-      existing.comment = comment;
-      existing.rejectionReason = undefined;
-      await existing.save();
-      return res.status(201).json({ message: "Заявка отправлена повторно", enrollment: existing });
-    }
-
-    const enrollment = await Enrollment.create({
-      user: req.user._id,
-      circle: circleId,
-      comment,
-    });
-
-    res.status(201).json({ message: "Заявка отправлена", enrollment });
-  } catch (err) {
-    console.error("Ошибка /enroll:", err);
-    res.status(500).json({ message: "Ошибка при записи" });
-  }
-});
-
-app.get("/my-enrollments", authenticate, async (req, res) => {
-  try {
-    const enrollments = await Enrollment.find({ user: req.user._id })
-      .populate("circle", "title category schedule price currentPlaces maxPlaces teacher")
-      .select("-__v -updatedAt")
-      .lean();
-    const result = [];
-    for (const enr of enrollments) {
-      const item = { ...enr, circle: enr.circle, unreadCount: 0 };
-      if (enr.status === "approved" && enr.circle && enr.circle._id) {
-        const lastRead = await UserCircleLastRead.findOne({
-          user: req.user._id,
-          circle: enr.circle._id,
-        });
-        const since = lastRead ? lastRead.lastReadAt : new Date(0);
-        const unreadCount = await Message.countDocuments({
-          circle: enr.circle._id,
-          createdAt: { $gt: since },
-        });
-        item.unreadCount = unreadCount;
-      }
-      result.push(item);
-    }
-    res.json(result);
-  } catch (err) {
-    console.error("Ошибка /my-enrollments:", err);
-    res.status(500).json({ message: "Не удалось загрузить ваши записи" });
-  }
-});
-
-// Удалить свою запись (только отклонённую или отменённую)
-app.delete("/my-enrollments/:id", authenticate, async (req, res) => {
-  try {
-    const enrollment = await Enrollment.findById(req.params.id);
-    if (!enrollment) return res.status(404).json({ message: "Запись не найдена" });
-    if (enrollment.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Можно удалить только свою запись" });
-    }
-    if (!["rejected", "cancelled"].includes(enrollment.status)) {
-      return res.status(400).json({ message: "Удалить можно только отклонённую или отменённую запись" });
-    }
-    await Enrollment.findByIdAndDelete(req.params.id);
-    res.json({ message: "Запись удалена" });
-  } catch (err) {
-    console.error("Ошибка удаления записи:", err);
-    res.status(500).json({ message: "Не удалось удалить запись" });
-  }
-});
-
-// Кружки, которые ведёт преподаватель (для роли teacher)
-app.get("/teacher/circles", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "teacher" && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Доступ только для преподавателя" });
-    }
-    const query = req.user.role === "admin"
-      ? {}
-      : { teacher: req.user._id };
-    const circles = await Circle.find(query)
-      .select("title category schedule currentPlaces maxPlaces")
-      .sort({ title: 1 })
-      .lean();
-    res.json(circles);
-  } catch (err) {
-    console.error("Ошибка /teacher/circles:", err);
-    res.status(500).json({ message: "Ошибка загрузки кружков" });
-  }
-});
-
-// Заявки на кружки преподавателя (только свои кружки для teacher, все для admin)
-app.get("/teacher/enrollments", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "teacher" && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Доступ только для преподавателя" });
-    }
-    const circleQuery = req.user.role === "admin" ? {} : { teacher: req.user._id };
-    const circleIds = await Circle.find(circleQuery).distinct("_id");
-    const enrollments = await Enrollment.find({ circle: { $in: circleIds } })
-      .populate("user", "username fullName phone email")
-      .populate("circle", "title category")
-      .sort({ createdAt: -1 })
-      .select("-__v -updatedAt");
-    res.json(enrollments);
-  } catch (err) {
-    console.error("Ошибка /teacher/enrollments:", err);
-    res.status(500).json({ message: "Ошибка загрузки заявок" });
-  }
-});
-
-// Изменение статуса заявки преподавателем (только для заявок на свои кружки)
-app.put("/teacher/enrollments/:id/status", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "teacher" && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Доступ только для преподавателя" });
-    }
-    const { status, rejectionReason } = req.body;
-    if (!["approved", "rejected", "cancelled"].includes(status)) {
-      return res.status(400).json({ message: "Недопустимый статус" });
-    }
-
-    const enrollment = await Enrollment.findById(req.params.id).populate("circle");
-    if (!enrollment) return res.status(404).json({ message: "Заявка не найдена" });
-
-    const circle = await Circle.findById(enrollment.circle._id || enrollment.circle);
-    if (!circle) return res.status(404).json({ message: "Кружок не найден" });
-    const isMyCircle = req.user.role === "admin" || circle.teacher?.toString() === req.user._id.toString();
-    if (!isMyCircle) {
-      return res.status(403).json({ message: "Вы можете менять только заявки на свои кружки" });
-    }
-
-    const prevStatus = enrollment.status;
-    enrollment.rejectionReason = status === "rejected" && rejectionReason ? rejectionReason.trim() : undefined;
-    enrollment.rejectedAs = status === "rejected" ? (prevStatus === "approved" ? "removed_from_circle" : "application") : undefined;
-
-    if (status === "approved" && prevStatus !== "approved") {
-      const updated = await Circle.findOneAndUpdate(
-        { _id: enrollment.circle._id || enrollment.circle, $expr: { $lt: ["$currentPlaces", "$maxPlaces"] } },
-        { $inc: { currentPlaces: 1 } },
-        { new: true }
-      );
-      if (!updated) {
-        return res.status(409).json({ message: "Нет свободных мест в кружке" });
-      }
-    }
-
-    if (prevStatus === "approved" && status !== "approved") {
-      await Circle.findOneAndUpdate(
-        { _id: enrollment.circle._id || enrollment.circle },
-        [{ $set: { currentPlaces: { $max: [0, { $subtract: ["$currentPlaces", 1] }] } } }]
-      );
-    }
-
-    enrollment.status = status;
-    await enrollment.save();
-
-    res.json({ message: `Статус изменён → ${status}`, enrollment });
-  } catch (err) {
-    console.error("Ошибка изменения статуса заявки (teacher):", err);
-    res.status(500).json({ message: "Ошибка изменения статуса" });
-  }
-});
-
 // ──── Админ ────
 
 app.use("/admin", authenticate, adminOnly);
@@ -805,7 +493,6 @@ app.get("/admin/themes", async (_req, res) => {
   try {
     const themes = await Theme.find()
       .populate("course", "title")
-      .populate("teacher", "fullName username")
       .sort({ createdAt: -1 });
     res.json(themes);
   } catch (err) {
@@ -816,15 +503,9 @@ app.get("/admin/themes", async (_req, res) => {
 
 app.post("/admin/themes", async (req, res) => {
   try {
-    const { title, description, course, teacher } = req.body;
+    const { title, description, course } = req.body;
     if (!title?.trim() || !course) return res.status(400).json({ message: "title и course обязательны" });
-    if (teacher) {
-      const teacherUser = await User.findById(teacher);
-      if (!teacherUser || teacherUser.role !== "teacher") {
-        return res.status(400).json({ message: "Указан некорректный преподаватель" });
-      }
-    }
-    const created = await Theme.create({ title: title.trim(), description, course, teacher: teacher || null });
+    const created = await Theme.create({ title: title.trim(), description, course });
     res.status(201).json({ message: "Тема создана", theme: created });
   } catch (err) {
     console.error("Ошибка создания темы:", err);
@@ -834,12 +515,6 @@ app.post("/admin/themes", async (req, res) => {
 
 app.put("/admin/themes/:id", async (req, res) => {
   try {
-    if (req.body.teacher) {
-      const teacherUser = await User.findById(req.body.teacher);
-      if (!teacherUser || teacherUser.role !== "teacher") {
-        return res.status(400).json({ message: "Указан некорректный преподаватель" });
-      }
-    }
     const updated = await Theme.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ message: "Тема не найдена" });
     res.json({ message: "Тема обновлена", theme: updated });
@@ -906,137 +581,80 @@ app.delete("/admin/categories/:id", async (req, res) => {
 });
 
 app.get("/admin/assignments", async (_req, res) => {
-  return res.status(403).json({ message: "Заданиями управляет преподаватель" });
-});
-
-app.post("/admin/assignments", async (req, res) => {
-  return res.status(403).json({ message: "Задания создаёт преподаватель" });
-});
-
-app.put("/admin/assignments/:id", async (req, res) => {
-  return res.status(403).json({ message: "Заданиями управляет преподаватель" });
-});
-
-app.delete("/admin/assignments/:id", async (req, res) => {
-  return res.status(403).json({ message: "Заданиями управляет преподаватель" });
-});
-
-app.post("/admin/assignments/:id/document", upload.single("file"), async (req, res) => {
-  return res.status(403).json({ message: "Файлом задания управляет преподаватель" });
-});
-
-app.put("/admin/assignments/:id/test", async (req, res) => {
-  return res.status(403).json({ message: "Тестом управляет преподаватель" });
-});
-
-app.get("/admin/grades", async (_req, res) => {
-  return res.status(403).json({ message: "Оценки выставляет преподаватель" });
-});
-
-app.put("/admin/grades/:id", async (req, res) => {
-  return res.status(403).json({ message: "Оценки выставляет преподаватель" });
-});
-
-app.post("/admin/grades/:id/recalculate", async (req, res) => {
-  return res.status(403).json({ message: "Оценки пересчитывает преподаватель" });
-});
-
-app.post("/admin/assignments/:assignmentId/retake/:studentId", async (req, res) => {
-  return res.status(403).json({ message: "Повторную попытку назначает преподаватель" });
-});
-
-// ──── LMS (преподаватель) ────
-
-app.get("/teacher/lms/themes", authenticate, teacherOnly, async (req, res) => {
   try {
-    const themes = await Theme.find({ teacher: req.user._id })
-      .populate("course", "title")
-      .sort({ createdAt: -1 });
-    res.json(themes);
-  } catch (err) {
-    console.error("Ошибка загрузки тем преподавателя:", err);
-    res.status(500).json({ message: "Ошибка загрузки тем" });
-  }
-});
-
-app.get("/teacher/lms/groups", authenticate, teacherOnly, async (req, res) => {
-  try {
-    const teacherCourses = await Theme.find({ teacher: req.user._id }).distinct("course");
-    const groups = await Group.find({ course: { $in: teacherCourses } })
-      .populate("course", "title")
-      .sort({ name: 1 });
-    res.json(groups);
-  } catch (err) {
-    console.error("Ошибка загрузки групп преподавателя:", err);
-    res.status(500).json({ message: "Ошибка загрузки групп" });
-  }
-});
-
-app.get("/teacher/lms/categories", authenticate, teacherOnly, async (_req, res) => {
-  try {
-    const categories = await Category.find().sort({ name: 1 });
-    res.json(categories);
-  } catch (err) {
-    console.error("Ошибка загрузки категорий для преподавателя:", err);
-    res.status(500).json({ message: "Ошибка загрузки категорий" });
-  }
-});
-
-app.get("/teacher/lms/assignments", authenticate, teacherOnly, async (req, res) => {
-  try {
-    const teacherThemeIds = await Theme.find({ teacher: req.user._id }).distinct("_id");
-    const assignments = await Assignment.find({ theme: { $in: teacherThemeIds } })
+    const assignments = await Assignment.find()
       .populate("theme", "title")
       .populate("group", "name")
       .populate("category", "name")
       .sort({ createdAt: -1 });
     res.json(assignments);
   } catch (err) {
-    console.error("Ошибка загрузки заданий преподавателя:", err);
+    console.error("Ошибка загрузки заданий:", err);
     res.status(500).json({ message: "Ошибка загрузки заданий" });
   }
 });
 
-app.post("/teacher/lms/assignments", authenticate, teacherOnly, async (req, res) => {
+app.post("/admin/assignments", async (req, res) => {
   try {
-    const { theme } = req.body;
-    const themeDoc = await Theme.findById(theme);
-    if (!themeDoc) return res.status(404).json({ message: "Тема не найдена" });
-    if (String(themeDoc.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно создавать задания только по своим темам" });
-    }
-    const created = await Assignment.create(req.body);
+    const payload = {
+      ...req.body,
+      maxScore: 100,
+    };
+    const created = await Assignment.create(payload);
     res.status(201).json({ message: "Задание создано", assignment: created });
   } catch (err) {
-    console.error("Ошибка создания задания преподавателем:", err);
+    console.error("Ошибка создания задания:", err);
     res.status(500).json({ message: "Ошибка создания задания" });
   }
 });
 
-app.delete("/teacher/lms/assignments/:id", authenticate, teacherOnly, async (req, res) => {
+app.put("/admin/assignments/:id", async (req, res) => {
   try {
-    const assignment = await Assignment.findById(req.params.id).populate("theme", "teacher");
+    const payload = {
+      ...req.body,
+      maxScore: 100,
+    };
+    const updated = await Assignment.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ message: "Задание не найдено" });
+    res.json({ message: "Задание обновлено", assignment: updated });
+  } catch (err) {
+    console.error("Ошибка обновления задания:", err);
+    res.status(500).json({ message: "Ошибка обновления задания" });
+  }
+});
+
+app.delete("/admin/assignments/:id", async (req, res) => {
+  try {
+    const assignment = await Assignment.findByIdAndDelete(req.params.id);
     if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
-    if (String(assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно удалять только свои задания" });
-    }
-    await Assignment.findByIdAndDelete(req.params.id);
     await Submission.deleteMany({ assignment: req.params.id });
     res.json({ message: "Задание удалено" });
   } catch (err) {
-    console.error("Ошибка удаления задания преподавателем:", err);
+    console.error("Ошибка удаления задания:", err);
     res.status(500).json({ message: "Ошибка удаления задания" });
   }
 });
 
-app.put("/teacher/lms/assignments/:id/test", authenticate, teacherOnly, async (req, res) => {
+app.post("/admin/assignments/:id/document", upload.single("file"), async (req, res) => {
   try {
-    const assignment = await Assignment.findById(req.params.id).populate("theme", "teacher");
+    if (!req.file) return res.status(400).json({ message: "Файл обязателен" });
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
+    if (assignment.type !== "DOCUMENT") return res.status(400).json({ message: "Это не документное задание" });
+    assignment.documentFile = `/uploads/${req.file.filename}`;
+    await assignment.save();
+    res.json({ message: "Файл задания загружен", assignment });
+  } catch (err) {
+    console.error("Ошибка загрузки файла задания:", err);
+    res.status(500).json({ message: "Ошибка загрузки файла" });
+  }
+});
+
+app.put("/admin/assignments/:id/test", async (req, res) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
     if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
     if (assignment.type !== "TEST") return res.status(400).json({ message: "Это не тест" });
-    if (String(assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно редактировать только свои тесты" });
-    }
     const { questions } = req.body;
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ message: "Нужен массив вопросов" });
@@ -1045,54 +663,30 @@ app.put("/teacher/lms/assignments/:id/test", authenticate, teacherOnly, async (r
     await assignment.save();
     res.json({ message: "Тест обновлён", assignment });
   } catch (err) {
-    console.error("Ошибка обновления теста преподавателем:", err);
+    console.error("Ошибка обновления теста:", err);
     res.status(500).json({ message: "Ошибка обновления теста" });
   }
 });
 
-app.post("/teacher/lms/assignments/:id/document", authenticate, teacherOnly, upload.single("file"), async (req, res) => {
+app.get("/admin/grades", async (_req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "Файл обязателен" });
-    const assignment = await Assignment.findById(req.params.id).populate("theme", "teacher");
-    if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
-    if (assignment.type !== "DOCUMENT") return res.status(400).json({ message: "Это не документное задание" });
-    if (String(assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно обновлять файл только своего задания" });
-    }
-    assignment.documentFile = `/uploads/${req.file.filename}`;
-    await assignment.save();
-    res.json({ message: "Файл задания загружен", assignment });
-  } catch (err) {
-    console.error("Ошибка загрузки файла задания преподавателем:", err);
-    res.status(500).json({ message: "Ошибка загрузки файла" });
-  }
-});
-
-app.get("/teacher/lms/grades", authenticate, teacherOnly, async (req, res) => {
-  try {
-    const teacherThemeIds = await Theme.find({ teacher: req.user._id }).distinct("_id");
-    const assignmentIds = await Assignment.find({ theme: { $in: teacherThemeIds } }).distinct("_id");
-    const rows = await Submission.find({ assignment: { $in: assignmentIds } })
+    const rows = await Submission.find()
       .populate("student", "fullName username email")
       .populate("assignment", "title type maxScore deadline")
       .sort({ updatedAt: -1 })
       .lean();
     res.json(rows);
   } catch (err) {
-    console.error("Ошибка загрузки оценок преподавателя:", err);
+    console.error("Ошибка загрузки оценок:", err);
     res.status(500).json({ message: "Ошибка загрузки оценок" });
   }
 });
 
-app.put("/teacher/lms/grades/:id", authenticate, teacherOnly, async (req, res) => {
+app.put("/admin/grades/:id", async (req, res) => {
   try {
     const { manualScore } = req.body;
-    const submission = await Submission.findById(req.params.id)
-      .populate({ path: "assignment", populate: { path: "theme", select: "teacher" } });
+    const submission = await Submission.findById(req.params.id).populate("assignment", "maxScore");
     if (!submission) return res.status(404).json({ message: "Отправка не найдена" });
-    if (String(submission.assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно оценивать только свои задания" });
-    }
 
     const maxScore = submission.assignment.maxScore || 100;
     const score = Number(manualScore);
@@ -1109,19 +703,15 @@ app.put("/teacher/lms/grades/:id", authenticate, teacherOnly, async (req, res) =
 
     res.json({ message: "Оценка обновлена", submission });
   } catch (err) {
-    console.error("Ошибка выставления оценки преподавателем:", err);
+    console.error("Ошибка выставления оценки:", err);
     res.status(500).json({ message: "Ошибка изменения оценки" });
   }
 });
 
-app.post("/teacher/lms/grades/:id/recalculate", authenticate, teacherOnly, async (req, res) => {
+app.post("/admin/grades/:id/recalculate", async (req, res) => {
   try {
-    const submission = await Submission.findById(req.params.id)
-      .populate({ path: "assignment", populate: { path: "theme", select: "teacher" } });
+    const submission = await Submission.findById(req.params.id).populate("assignment");
     if (!submission) return res.status(404).json({ message: "Отправка не найдена" });
-    if (String(submission.assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно пересчитывать только свои тесты" });
-    }
     if (submission.assignment.type !== "TEST") {
       return res.status(400).json({ message: "Пересчёт доступен только для тестов" });
     }
@@ -1136,18 +726,26 @@ app.post("/teacher/lms/grades/:id/recalculate", authenticate, teacherOnly, async
 
     res.json({ message: "Оценка пересчитана", submission });
   } catch (err) {
-    console.error("Ошибка пересчёта оценки преподавателем:", err);
+    console.error("Ошибка пересчёта оценки:", err);
     res.status(500).json({ message: "Ошибка пересчёта" });
   }
 });
 
-app.post("/teacher/lms/assignments/:assignmentId/retake/:studentId", authenticate, teacherOnly, async (req, res) => {
+app.post("/admin/assignments/:assignmentId/retake/:studentId", async (req, res) => {
   try {
     const { assignmentId, studentId } = req.params;
-    const assignment = await Assignment.findById(assignmentId).populate("theme", "teacher");
+    const assignment = await Assignment.findById(assignmentId);
     if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
-    if (String(assignment.theme.teacher) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Можно назначать повтор только по своим заданиям" });
+
+    const latestByStudent = await Submission.findOne({ assignment: assignmentId, student: studentId }).sort({ attempt: -1 });
+    const overdue = isAfterDeadline(assignment);
+    const alreadyDone = !!latestByStudent && ["submitted", "graded", "overdue"].includes(latestByStudent.status);
+    const isTest = assignment.type === "TEST";
+
+    if (!isTest && !overdue && !alreadyDone) {
+      return res.status(400).json({
+        message: "Повторная попытка доступна для тестов, просроченных или уже выполненных заданий",
+      });
     }
 
     const latest = await Submission.findOne({ assignment: assignmentId, student: studentId }).sort({ attempt: -1 });
@@ -1163,18 +761,20 @@ app.post("/teacher/lms/assignments/:assignmentId/retake/:studentId", authenticat
 
     res.status(201).json({ message: "Создана повторная попытка", submission: created });
   } catch (err) {
-    console.error("Ошибка создания повторной попытки преподавателем:", err);
+    console.error("Ошибка создания повторной попытки:", err);
     res.status(500).json({ message: "Ошибка повторной попытки" });
   }
 });
 
 app.get("/admin/dashboard-lms", async (_req, res) => {
   try {
-    const [students, submissions, groups, gradedRows] = await Promise.all([
+    const [students, submissions, groups] = await Promise.all([
       User.find({ role: "student" }).select("fullName username email group lastLogin").populate("group", "name"),
-      Submission.find().populate("assignment", "deadline").lean(),
+      Submission.find()
+        .populate("student", "fullName username group")
+        .populate("assignment", "title deadline type maxScore")
+        .lean(),
       Group.find().lean(),
-      Submission.find({ status: "graded" }).select("finalScore student").lean(),
     ]);
 
     const now = new Date();
@@ -1184,6 +784,7 @@ app.get("/admin/dashboard-lms", async (_req, res) => {
       return dl && dl.getTime() < now.getTime() && s.status !== "graded" && s.status !== "submitted";
     }).length;
 
+    const gradedRows = submissions.filter((s) => s.status === "graded");
     const avgScore = gradedRows.length
       ? Math.round(gradedRows.reduce((sum, r) => sum + (r.finalScore || 0), 0) / gradedRows.length)
       : 0;
@@ -1202,12 +803,88 @@ app.get("/admin/dashboard-lms", async (_req, res) => {
       };
     });
 
+    const completedAssignmentsList = submissions
+      .filter((s) => ["submitted", "graded"].includes(s.status))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 200)
+      .map((s) => ({
+        submissionId: s._id,
+        status: s.status,
+        finalScore: s.finalScore || 0,
+        updatedAt: s.updatedAt,
+        student: s.student
+          ? {
+              _id: s.student._id,
+              fullName: s.student.fullName,
+              username: s.student.username,
+            }
+          : null,
+        assignment: s.assignment
+          ? {
+              _id: s.assignment._id,
+              title: s.assignment.title,
+              type: s.assignment.type,
+              deadline: s.assignment.deadline,
+            }
+          : null,
+      }));
+
+    const overdueAssignmentsList = submissions
+      .filter((s) => {
+        const dl = s.assignment?.deadline ? new Date(s.assignment.deadline) : null;
+        return dl && dl.getTime() < now.getTime() && !["submitted", "graded"].includes(s.status);
+      })
+      .sort((a, b) => new Date(a.assignment.deadline).getTime() - new Date(b.assignment.deadline).getTime())
+      .slice(0, 200)
+      .map((s) => ({
+        submissionId: s._id,
+        status: s.status,
+        updatedAt: s.updatedAt,
+        student: s.student
+          ? {
+              _id: s.student._id,
+              fullName: s.student.fullName,
+              username: s.student.username,
+            }
+          : null,
+        assignment: s.assignment
+          ? {
+              _id: s.assignment._id,
+              title: s.assignment.title,
+              type: s.assignment.type,
+              deadline: s.assignment.deadline,
+            }
+          : null,
+      }));
+
+    const studentGrades = students.map((student) => {
+      const items = gradedRows.filter((s) => String(s.student?._id || s.student) === String(student._id));
+      const average = items.length ? Math.round(items.reduce((sum, s) => sum + (s.finalScore || 0), 0) / items.length) : 0;
+      return {
+        studentId: student._id,
+        fullName: student.fullName,
+        username: student.username,
+        groupName: typeof student.group === "string" ? student.group : student.group?.name || "-",
+        averageScore: average,
+        grades: items.map((s) => ({
+          submissionId: s._id,
+          assignmentTitle: s.assignment?.title || "-",
+          assignmentType: s.assignment?.type || "-",
+          score: s.finalScore || 0,
+          gradedAt: s.gradedAt,
+        })),
+      };
+    });
+
     res.json({
       studentsLastLogin: students,
       completedAssignments: completedCount,
       overdueAssignments: overdueCount,
       averageScore: avgScore,
       groupStats: byGroup,
+      studentGrades,
+      completedAssignmentsList,
+      overdueAssignmentsList,
     });
   } catch (err) {
     console.error("Ошибка LMS dashboard:", err);
@@ -1388,136 +1065,6 @@ app.get("/student/grades", authenticate, studentOnly, async (req, res) => {
   }
 });
 
-app.get("/admin/circles", async (req, res) => {
-  try {
-    const circles = await Circle.find()
-      .populate("teacher", "fullName username")
-      .select("-__v")
-      .sort({ title: 1 });
-    res.json(circles);
-  } catch (err) {
-    console.error("Ошибка загрузки кружков:", err);
-    res.status(500).json({ message: "Ошибка загрузки кружков" });
-  }
-});
-
-app.post("/admin/circles", async (req, res) => {
-  try {
-    const circle = await Circle.create(req.body);
-    res.status(201).json({ message: "Кружок создан", circle });
-  } catch (err) {
-    console.error("Ошибка создания кружка:", err);
-    res.status(400).json({ message: "Ошибка создания", error: err.message });
-  }
-});
-
-app.put("/admin/circles/:id", async (req, res) => {
-  try {
-    const circle = await Circle.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-    if (!circle) return res.status(404).json({ message: "Кружок не найден" });
-    res.json({ message: "Кружок обновлён", circle });
-  } catch (err) {
-    console.error("Ошибка обновления кружка:", err);
-    res.status(400).json({ message: "Ошибка обновления" });
-  }
-});
-
-app.delete("/admin/circles/:id", async (req, res) => {
-  try {
-    const circle = await Circle.findByIdAndDelete(req.params.id);
-    if (!circle) return res.status(404).json({ message: "Не найден" });
-    await Enrollment.deleteMany({ circle: req.params.id });
-    await Message.deleteMany({ circle: req.params.id });
-    res.json({ message: "Кружок удалён" });
-  } catch (err) {
-    console.error("Ошибка удаления кружка:", err);
-    res.status(500).json({ message: "Ошибка удаления" });
-  }
-});
-
-app.get("/admin/enrollments", async (req, res) => {
-  try {
-    const enrollments = await Enrollment.find()
-      .populate("user", "username fullName phone email")
-      .populate("circle", "title category")
-      .sort({ createdAt: -1 })
-      .select("-__v -updatedAt");
-    res.json(enrollments);
-  } catch (err) {
-    console.error("Ошибка загрузки заявок:", err);
-    res.status(500).json({ message: "Ошибка загрузки заявок" });
-  }
-});
-
-app.put("/admin/enrollments/:id/status", async (req, res) => {
-  try {
-    const { status, rejectionReason } = req.body;
-    if (!["approved", "rejected", "cancelled"].includes(status)) {
-      return res.status(400).json({ message: "Недопустимый статус" });
-    }
-
-    const enrollment = await Enrollment.findById(req.params.id);
-    if (!enrollment) return res.status(404).json({ message: "Заявка не найдена" });
-
-    const prevStatus = enrollment.status;
-    enrollment.rejectionReason = status === "rejected" && rejectionReason ? rejectionReason.trim() : undefined;
-    enrollment.rejectedAs = status === "rejected" ? (prevStatus === "approved" ? "removed_from_circle" : "application") : undefined;
-
-    // Одобрение: атомарно увеличиваем места только если есть свободные (защита от race condition)
-    if (status === "approved" && prevStatus !== "approved") {
-      const updated = await Circle.findOneAndUpdate(
-        { _id: enrollment.circle, $expr: { $lt: ["$currentPlaces", "$maxPlaces"] } },
-        { $inc: { currentPlaces: 1 } },
-        { new: true }
-      );
-      if (!updated) {
-        return res.status(409).json({ message: "Нет свободных мест в кружке" });
-      }
-    }
-
-    // Снятие одобрения: атомарно уменьшаем счётчик (не ниже 0)
-    if (prevStatus === "approved" && status !== "approved") {
-      await Circle.findOneAndUpdate(
-        { _id: enrollment.circle },
-        [{ $set: { currentPlaces: { $max: [0, { $subtract: ["$currentPlaces", 1] }] } } }]
-      );
-    }
-
-    enrollment.status = status;
-    await enrollment.save();
-
-    res.json({ message: `Статус изменён → ${status}`, enrollment });
-  } catch (err) {
-    console.error("Ошибка изменения статуса:", err);
-    res.status(500).json({ message: "Ошибка изменения статуса" });
-  }
-});
-
-// Удаление заявки (админ)
-app.delete("/admin/enrollments/:id", async (req, res) => {
-  try {
-    const enrollment = await Enrollment.findById(req.params.id);
-    if (!enrollment) return res.status(404).json({ message: "Заявка не найдена" });
-
-    // Если заявка была одобрена — освобождаем место в кружке
-    if (enrollment.status === "approved") {
-      await Circle.findOneAndUpdate(
-        { _id: enrollment.circle },
-        [{ $set: { currentPlaces: { $max: [0, { $subtract: ["$currentPlaces", 1] }] } } }]
-      );
-    }
-
-    await Enrollment.findByIdAndDelete(req.params.id);
-    res.json({ message: "Заявка удалена" });
-  } catch (err) {
-    console.error("Ошибка удаления заявки:", err);
-    res.status(500).json({ message: "Ошибка удаления заявки" });
-  }
-});
-
 // Список пользователей (админ)
 app.get("/admin/users", async (req, res) => {
   try {
@@ -1536,7 +1083,7 @@ app.get("/admin/users", async (req, res) => {
 app.put("/admin/users/:id", async (req, res) => {
   try {
     const { role, group } = req.body;
-    if (role !== undefined && !["student", "admin", "teacher"].includes(role)) {
+    if (role !== undefined && !["student", "admin"].includes(role)) {
       return res.status(400).json({ message: "Недопустимая роль" });
     }
     if (role !== undefined && req.params.id === req.user._id.toString() && role !== "admin") {
@@ -1569,65 +1116,12 @@ app.put("/admin/users/:id", async (req, res) => {
   }
 });
 
-// Статистика (админ)
-app.get("/admin/stats", async (req, res) => {
-  try {
-    const [circlesCount, enrollmentsCount, usersCount, topCircles] = await Promise.all([
-      Circle.countDocuments({ isActive: true }),
-      Enrollment.countDocuments(),
-      User.countDocuments(),
-      Enrollment.aggregate([
-        { $group: { _id: "$circle", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 },
-        {
-          $lookup: {
-            from: "circles",
-            localField: "_id",
-            foreignField: "_id",
-            as: "circleDoc",
-          },
-        },
-        { $unwind: { path: "$circleDoc", preserveNullAndEmptyArrays: true } },
-        {
-          $project: {
-            title: { $ifNull: ["$circleDoc.title", "(удалён)"] },
-            enrollmentsCount: "$count",
-          },
-        },
-      ]),
-    ]);
-
-    res.json({
-      circlesCount,
-      enrollmentsCount,
-      usersCount,
-      topCircles,
-    });
-  } catch (err) {
-    console.error("Ошибка загрузки статистики:", err);
-    res.status(500).json({ message: "Ошибка загрузки статистики" });
-  }
-});
-
 app.get("/health", (_req, res) => {
   res.json({
     message: "Backend работает!",
     status: "online",
     time: new Date().toISOString(),
   });
-});
-
-app.get("/admin/teachers", async (_req, res) => {
-  try {
-    const teachers = await User.find({ role: "teacher" })
-      .select("fullName username email")
-      .sort({ fullName: 1, username: 1 });
-    res.json(teachers);
-  } catch (err) {
-    console.error("Ошибка загрузки преподавателей:", err);
-    res.status(500).json({ message: "Ошибка загрузки преподавателей" });
-  }
 });
 
 const clientDistDir = path.resolve(__dirname, "..", "dist");

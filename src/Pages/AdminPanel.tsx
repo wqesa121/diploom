@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import CircleList from "../components/admin/CircleList";
-import EnrollmentList from "../components/admin/EnrollmentList";
 import LmsPanel from "../components/admin/LmsPanel";
 import UserList from "../components/admin/UserList";
-import Stats from "../components/admin/Stats";
 
 export default function AdminPanel() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<
-    "circles" | "enrollments" | "users" | "stats" | "lms"
-  >("circles");
+    "users" | "lms"
+  >("lms");
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
@@ -45,11 +42,8 @@ export default function AdminPanel() {
   }
 
   const tabs = [
-    { id: "circles" as const, label: "Кружки" },
-    { id: "enrollments" as const, label: "Записи" },
     { id: "lms" as const, label: "LMS" },
     { id: "users" as const, label: "Пользователи" },
-    { id: "stats" as const, label: "Статистика" },
   ];
 
   return (
@@ -83,20 +77,11 @@ export default function AdminPanel() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-6 sm:p-8">
-          {activeTab === "circles" && (
-            <CircleList token={token} setError={setError} />
-          )}
-          {activeTab === "enrollments" && (
-            <EnrollmentList token={token} setError={setError} />
-          )}
           {activeTab === "lms" && (
             <LmsPanel token={token} setError={setError} />
           )}
           {activeTab === "users" && (
             <UserList token={token} setError={setError} />
-          )}
-          {activeTab === "stats" && (
-            <Stats token={token} setError={setError} />
           )}
         </div>
       </div>

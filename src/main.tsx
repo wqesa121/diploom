@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
@@ -12,14 +12,10 @@ import ProtectedRoute from './components/ProtectedRoute.tsx'
 // Страницы
 import Login from './Pages/Login.tsx'
 import Register from './Pages/Register.tsx'
-import CirclesList from './Pages/CirclesList.tsx'
-import CircleDetail from './Pages/CircleDetail.tsx'
 import LmsStudent from './Pages/LmsStudent.tsx'
-import MyGrades from './Pages/MyGrades.tsx'
-import TeacherLms from './Pages/TeacherLms.tsx'
-import MyEnrollments from './Pages/MyEnrollments.tsx'
-import MyCircles from './Pages/MyCircles.tsx'
 import AdminPanel from './Pages/AdminPanel.tsx'
+
+const token = localStorage.getItem("token")
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -28,18 +24,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Header />
         <main className="flex-grow">
           <Routes>
-            <Route path="/" element={<CirclesList />} />
-            <Route path="/circle/:id" element={<CircleDetail />} />
+            <Route path="/" element={token ? <Navigate to="/lms" replace /> : <Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
             {/* Только для авторизованных */}
             <Route element={<ProtectedRoute />}>
               <Route path="/lms" element={<LmsStudent />} />
-              <Route path="/grades" element={<MyGrades />} />
-              <Route path="/teacher-lms" element={<TeacherLms />} />
-              <Route path="/my-enrollments" element={<MyEnrollments />} />
-              <Route path="/my-circles" element={<MyCircles />} />
             </Route>
 
             {/* Только для админа */}
