@@ -416,7 +416,14 @@ app.put("/profile", authenticate, async (req, res) => {
   }
 });
 
-app.use("/admin", authenticate, adminOnly);
+app.use("/admin", (req, res, next) => {
+  // Let SPA route /admin load without API auth checks on browser refresh.
+  if (req.method === "GET" && req.path === "/") {
+    return next();
+  }
+
+  return authenticate(req, res, () => adminOnly(req, res, next));
+});
 
 app.get("/admin/courses", async (_req, res) => {
   try {
