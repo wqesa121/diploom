@@ -22,7 +22,7 @@ export default function AdminPanel() {
 
     try {
       const parsedUser = JSON.parse(user);
-      if (parsedUser.role !== "admin") {
+      if (!["admin", "head_admin"].includes(parsedUser.role)) {
         navigate("/");
         return;
       }

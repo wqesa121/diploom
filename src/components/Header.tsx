@@ -5,7 +5,7 @@ export default function Header() {
   const location = useLocation();
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = user.role === "admin";
+  const isAdmin = ["admin", "head_admin"].includes(user.role);
   const isStudent = user.role === "student";
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 

@@ -86,12 +86,13 @@ if (!process.env.JWT_SECRET && isProduction) {
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
-    role: { type: String, enum: ["student", "admin"], default: "student" },
+  role: { type: String, enum: ["student", "admin", "head_admin"], default: "student" },
   group: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },
   fullName: { type: String, required: true, trim: true },
   phone: { type: String, trim: true },
   email: { type: String, sparse: true, unique: true, lowercase: true, trim: true },
   lastLogin: { type: Date },
+  lastSeenAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -208,6 +209,16 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.userId).select("-password");
     if (!user) return res.status(401).json({ message: "Пользователь не найден" });
+
+    const now = new Date();
+    const lastSeen = user.lastSeenAt ? new Date(user.lastSeenAt) : null;
+    if (!lastSeen || now.getTime() - lastSeen.getTime() > 60 * 1000) {
+      user.lastSeenAt = now;
+      User.findByIdAndUpdate(user._id, { lastSeenAt: now }).catch((err) => {
+        console.error("Ошибка обновления lastSeenAt:", err);
+      });
+    }
+
     req.user = user;
     next();
   } catch (err) {
@@ -216,7 +227,7 @@ const authenticate = async (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-  if (req.user.role !== "admin") {
+  if (!["admin", "head_admin"].includes(req.user.role)) {
     return res.status(403).json({ message: "Доступ только для администратора" });
   }
   next();
@@ -361,6 +372,7 @@ app.post("/login", async (req, res) => {
     }
 
     user.lastLogin = new Date();
+    user.lastSeenAt = new Date();
     await user.save();
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
@@ -1101,11 +1113,27 @@ app.get("/student/grades", authenticate, studentOnly, async (req, res) => {
 // Список пользователей (админ)
 app.get("/admin/users", async (req, res) => {
   try {
+    const hasHeadAdmin = await User.exists({ role: "head_admin" });
+    const canManageAdminRoles = req.user.role === "head_admin" || (!hasHeadAdmin && req.user.role === "admin");
+
     const users = await User.find()
       .populate("group", "name course")
       .select("-password")
-      .sort({ createdAt: -1 });
-    res.json(users);
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const nowTs = Date.now();
+    const onlineWindowMs = 5 * 60 * 1000;
+    const payload = users.map((user) => {
+      const lastSeenTs = user.lastSeenAt ? new Date(user.lastSeenAt).getTime() : 0;
+      return {
+        ...user,
+        isOnline: !!lastSeenTs && nowTs - lastSeenTs <= onlineWindowMs,
+        canManageAdminRoles,
+      };
+    });
+
+    res.json(payload);
   } catch (err) {
     console.error("Ошибка загрузки пользователей:", err);
     res.status(500).json({ message: "Ошибка загрузки пользователей" });
@@ -1116,11 +1144,31 @@ app.get("/admin/users", async (req, res) => {
 app.put("/admin/users/:id", async (req, res) => {
   try {
     const { role, group } = req.body;
-    if (role !== undefined && !["student", "admin"].includes(role)) {
+    if (role !== undefined && !["student", "admin", "head_admin"].includes(role)) {
       return res.status(400).json({ message: "Недопустимая роль" });
     }
-    if (role !== undefined && req.params.id === req.user._id.toString() && role !== "admin") {
-      return res.status(400).json({ message: "Нельзя снять себе роль администратора" });
+
+    const targetUser = await User.findById(req.params.id).select("role");
+    if (!targetUser) return res.status(404).json({ message: "Пользователь не найден" });
+
+    if (role !== undefined) {
+      const requesterIsHead = req.user.role === "head_admin";
+      const hasHeadAdmin = await User.exists({ role: "head_admin" });
+      const bootstrapMode = !hasHeadAdmin && req.user.role === "admin";
+      const targetIsAdminLevel = ["admin", "head_admin"].includes(targetUser.role);
+      const nextIsAdminLevel = ["admin", "head_admin"].includes(role);
+
+      if ((targetIsAdminLevel || nextIsAdminLevel) && !requesterIsHead && !bootstrapMode) {
+        return res.status(403).json({ message: "Только head admin может менять админские роли" });
+      }
+
+      if (req.params.id === req.user._id.toString() && role === "student") {
+        return res.status(400).json({ message: "Нельзя снять с себя административную роль" });
+      }
+
+      if (req.params.id === req.user._id.toString() && req.user.role === "head_admin" && role !== "head_admin") {
+        return res.status(400).json({ message: "Head admin не может понизить себя" });
+      }
     }
 
     if (group) {
@@ -1142,10 +1190,37 @@ app.put("/admin/users/:id", async (req, res) => {
       .populate("group", "name course")
       .select("-password");
     if (!user) return res.status(404).json({ message: "Пользователь не найден" });
-    res.json({ message: "Роль обновлена", user });
+    res.json({ message: "Пользователь обновлён", user });
   } catch (err) {
     console.error("Ошибка обновления роли:", err);
     res.status(500).json({ message: "Ошибка обновления роли" });
+  }
+});
+
+app.delete("/admin/users/:id", async (req, res) => {
+  try {
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: "Нельзя удалить самого себя" });
+    }
+
+    const targetUser = await User.findById(req.params.id).select("role");
+    if (!targetUser) return res.status(404).json({ message: "Пользователь не найден" });
+
+    const requesterIsHead = req.user.role === "head_admin";
+    const hasHeadAdmin = await User.exists({ role: "head_admin" });
+    const bootstrapMode = !hasHeadAdmin && req.user.role === "admin";
+
+    if (["admin", "head_admin"].includes(targetUser.role) && !requesterIsHead && !bootstrapMode) {
+      return res.status(403).json({ message: "Только head admin может удалять администраторов" });
+    }
+
+    await Submission.deleteMany({ student: req.params.id });
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Пользователь удалён" });
+  } catch (err) {
+    console.error("Ошибка удаления пользователя:", err);
+    res.status(500).json({ message: "Ошибка удаления пользователя" });
   }
 });
 

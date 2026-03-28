@@ -8,8 +8,13 @@ interface User {
   fullName: string;
   email?: string;
   phone?: string;
-  role: "student" | "admin";
+  role: "student" | "admin" | "head_admin";
   createdAt: string;
+  lastLogin?: string;
+  lastSeenAt?: string;
+  isOnline?: boolean;
+  canManageAdminRoles?: boolean;
+  group?: { _id: string; name: string } | string | null;
 }
 
 interface UserListProps {
@@ -21,10 +26,17 @@ export default function UserList({ token, setError }: UserListProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const roleOptions = [
-    { value: "student", label: "Участник" },
-    { value: "admin", label: "Админ" },
-  ];
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const currentUserId = currentUser?._id || "";
+  const canManageAdminRoles = users[0]?.canManageAdminRoles ?? (currentUser?.role === "head_admin");
+
+  const roleOptions = canManageAdminRoles
+    ? [
+        { value: "student", label: "Участник" },
+        { value: "admin", label: "Админ" },
+        { value: "head_admin", label: "Head admin" },
+      ]
+    : [{ value: "student", label: "Участник" }];
 
   useEffect(() => {
     if (!token) return;
@@ -62,7 +74,7 @@ export default function UserList({ token, setError }: UserListProps) {
     fetchUsers();
   }, [token, setError]);
 
-  const changeRole = async (userId: string, role: "student" | "admin") => {
+  const changeRole = async (userId: string, role: "student" | "admin" | "head_admin") => {
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: "PUT",
@@ -88,7 +100,7 @@ export default function UserList({ token, setError }: UserListProps) {
       }
 
       setUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, role } : u))
+        prev.map((u) => (u._id === userId ? { ...u, ...data.user } : u))
       );
       toast.success("Роль обновлена", {
         position: "top-right",
@@ -99,6 +111,50 @@ export default function UserList({ token, setError }: UserListProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
     }
+  };
+
+  const deleteUser = async (user: User) => {
+    const confirmDelete = window.confirm(`Удалить пользователя ${user.fullName || user.username}?`);
+    if (!confirmDelete) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${user._id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("auth");
+        localStorage.removeItem("user");
+        setError("Сессия истекла. Пожалуйста, войдите заново.");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.message || "Не удалось удалить пользователя");
+        return;
+      }
+
+      setUsers((prev) => prev.filter((u) => u._id !== user._id));
+      toast.success("Пользователь удалён", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: true,
+        theme: "light",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+    }
+  };
+
+  const roleLabel = (role: User["role"]) => {
+    if (role === "head_admin") return "Head admin";
+    if (role === "admin") return "Админ";
+    return "Участник";
   };
 
   if (loading) {
@@ -122,6 +178,8 @@ export default function UserList({ token, setError }: UserListProps) {
                 <th className="py-3.5 px-4">Логин</th>
                 <th className="py-3.5 px-4">ФИО</th>
                 <th className="py-3.5 px-4">Email</th>
+                <th className="py-3.5 px-4">Статус</th>
+                <th className="py-3.5 px-4">Был в сети</th>
                 <th className="py-3.5 px-4">Роль</th>
                 <th className="py-3.5 px-4">Действия</th>
               </tr>
@@ -133,29 +191,65 @@ export default function UserList({ token, setError }: UserListProps) {
                   <td className="py-4 px-4">{user.fullName || "—"}</td>
                   <td className="py-4 px-4">{user.email || "—"}</td>
                   <td className="py-4 px-4">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      user.isOnline ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    }`}>
+                      <span className={`h-2 w-2 rounded-full ${user.isOnline ? "bg-emerald-500" : "bg-slate-400"}`} />
+                      {user.isOnline ? "Онлайн" : "Оффлайн"}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-xs text-slate-600 whitespace-nowrap">
+                    {user.lastSeenAt ? new Date(user.lastSeenAt).toLocaleString("ru-RU") : (user.lastLogin ? new Date(user.lastLogin).toLocaleString("ru-RU") : "ещё не входил")}
+                  </td>
+                  <td className="py-4 px-4">
                     <span
                       className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                        user.role === "admin"
+                        user.role === "head_admin"
+                          ? "bg-violet-100 text-violet-800"
+                          : user.role === "admin"
                           ? "bg-primary-100 text-primary-800"
                           : "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {user.role === "admin" ? "Админ" : "Участник"}
+                      {roleLabel(user.role)}
                     </span>
                   </td>
                   <td className="py-4 px-4">
-                    <SelectMenu
-                      value={user.role}
-                      options={roleOptions}
-                      onChange={(value) => changeRole(user._id, value as "student" | "admin")}
-                      className="max-w-[190px]"
-                    />
+                    <div className="flex items-center gap-2">
+                      <div className="w-[190px]">
+                        {canManageAdminRoles ? (
+                          <SelectMenu
+                            value={user.role}
+                            options={roleOptions}
+                            onChange={(value) => changeRole(user._id, value as "student" | "admin" | "head_admin")}
+                            className="max-w-[190px]"
+                          />
+                        ) : (
+                          <div className="h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-500 flex items-center">
+                            Роли меняет head admin
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteUser(user)}
+                        disabled={user._id === currentUserId}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {!canManageAdminRoles && (
+        <p className="mt-3 text-xs text-slate-500">
+          Вы можете просматривать онлайн-статус и удалять пользователей, но назначение админских ролей доступно только head admin.
+        </p>
       )}
     </div>
   );
