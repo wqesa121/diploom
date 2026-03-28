@@ -164,6 +164,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   const [openedTestAssignmentId, setOpenedTestAssignmentId] = useState<string | null>(null);
   const [selectedGradeGroupId, setSelectedGradeGroupId] = useState("");
   const [selectedGradeStudentId, setSelectedGradeStudentId] = useState("");
+  const [gradeStudentQuery, setGradeStudentQuery] = useState("");
   const [selectedGradeAssignmentId, setSelectedGradeAssignmentId] = useState("");
 
   const studentUsers = useMemo(() => users.filter((user) => user.role === "student"), [users]);
@@ -292,6 +293,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
 
   useEffect(() => {
     setSelectedGradeStudentId("");
+    setGradeStudentQuery("");
     setSelectedGradeAssignmentId("");
   }, [selectedGradeGroupId]);
 
@@ -313,6 +315,14 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   useEffect(() => {
     setSelectedGradeAssignmentId("");
   }, [selectedGradeStudentId]);
+
+  useEffect(() => {
+    if (!selectedGradeStudentId) return;
+    const selectedStudent = studentsWithGrades.find((student) => student._id === selectedGradeStudentId);
+    if (selectedStudent) {
+      setGradeStudentQuery(selectedStudent.fullName || selectedStudent.username);
+    }
+  }, [selectedGradeStudentId, studentsWithGrades]);
 
   const createItem = async (url: string, body: object, successMessage: string, reset?: () => void) => {
     try {
@@ -1069,14 +1079,47 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
                 onChange={setSelectedGradeGroupId}
               />
 
-              <SelectMenu
-                value={selectedGradeStudentId}
-                options={[
-                  { value: "", label: "Выберите студента" },
-                  ...studentsWithGrades.map((student) => ({ value: student._id, label: student.fullName || student.username })),
-                ]}
-                onChange={setSelectedGradeStudentId}
+              <input
+                className="input-base"
+                placeholder="Поиск студента по ФИО"
+                value={gradeStudentQuery}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setGradeStudentQuery(value);
+
+                  const normalized = value.trim().toLowerCase();
+                  if (!normalized) {
+                    setSelectedGradeStudentId("");
+                    return;
+                  }
+
+                  const exact = studentsWithGrades.find((student) =>
+                    (student.fullName || student.username).toLowerCase() === normalized
+                  );
+                  if (exact) {
+                    setSelectedGradeStudentId(exact._id);
+                    return;
+                  }
+
+                  const partialMatches = studentsWithGrades.filter((student) =>
+                    (student.fullName || student.username).toLowerCase().includes(normalized)
+                  );
+
+                  if (partialMatches.length === 1) {
+                    setSelectedGradeStudentId(partialMatches[0]._id);
+                    return;
+                  }
+
+                  setSelectedGradeStudentId("");
+                }}
+                list="grade-students-list"
               />
+
+              <datalist id="grade-students-list">
+                {studentsWithGrades.map((student) => (
+                  <option key={student._id} value={student.fullName || student.username} />
+                ))}
+              </datalist>
 
               <SelectMenu
                 value={selectedGradeAssignmentId}
