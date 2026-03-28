@@ -202,6 +202,12 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
       .filter((row) => row.student?._id === selectedGradeStudentId && row.assignment?._id === selectedGradeAssignmentId)
       .sort((a, b) => (b.attempt || 0) - (a.attempt || 0));
   }, [grades, selectedGradeStudentId, selectedGradeAssignmentId]);
+  const gradeGroupOptions = useMemo(
+    () => (isRegularAdmin
+      ? groups.map((group) => ({ value: group._id, label: group.name }))
+      : [{ value: "", label: "Выберите группу" }, ...groups.map((group) => ({ value: group._id, label: group.name }))]),
+    [groups, isRegularAdmin]
+  );
 
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -288,6 +294,15 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
     setSelectedGradeStudentId("");
     setSelectedGradeAssignmentId("");
   }, [selectedGradeGroupId]);
+
+  useEffect(() => {
+    if (!isRegularAdmin) return;
+
+    const adminGroupId = groups[0]?._id || "";
+    if (adminGroupId && selectedGradeGroupId !== adminGroupId) {
+      setSelectedGradeGroupId(adminGroupId);
+    }
+  }, [groups, isRegularAdmin, selectedGradeGroupId]);
 
   useEffect(() => {
     if (isRegularAdmin && (activeTab === "groups" || activeTab === "students")) {
@@ -1050,10 +1065,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               <SelectMenu
                 value={selectedGradeGroupId}
-                options={[
-                  { value: "", label: "Выберите группу" },
-                  ...groups.map((group) => ({ value: group._id, label: group.name })),
-                ]}
+                options={gradeGroupOptions}
                 onChange={setSelectedGradeGroupId}
               />
 
