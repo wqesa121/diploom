@@ -173,14 +173,14 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   );
   const studentsWithGrades = useMemo(() => {
     const studentIdsWithRows = new Set(grades.map((row) => row.student?._id).filter(Boolean));
-    const byGroup = isHeadAdmin && selectedGradeGroupId
+    const byGroup = selectedGradeGroupId
       ? studentUsers.filter((user) => {
           const groupId = typeof user.group === "string" ? user.group : user.group?._id || "";
           return groupId === selectedGradeGroupId;
         })
       : studentUsers;
     return byGroup.filter((user) => studentIdsWithRows.has(user._id));
-  }, [grades, isHeadAdmin, selectedGradeGroupId, studentUsers]);
+  }, [grades, selectedGradeGroupId, studentUsers]);
   const gradeAssignmentsForStudent = useMemo(() => {
     if (!selectedGradeStudentId) return [] as Array<{ _id: string; title: string; type: string }>;
     const unique = new Map<string, { _id: string; title: string; type: string }>();
@@ -573,7 +573,7 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
   ] as const;
 
   const tabs = allTabs.filter((tab) => {
-    if (!isHeadAdmin && (tab.id === "groups" || tab.id === "students")) {
+    if (!isHeadAdmin && (tab.id === "courses" || tab.id === "groups" || tab.id === "students")) {
       return false;
     }
     return true;
@@ -1047,17 +1047,15 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
         <div className="space-y-4">
           <div className="card p-5 space-y-4">
             <h3 className="text-lg font-bold text-slate-900">Навигация по оценкам</h3>
-            <div className={`grid grid-cols-1 ${isHeadAdmin ? "lg:grid-cols-3" : "lg:grid-cols-2"} gap-3`}>
-              {isHeadAdmin && (
-                <SelectMenu
-                  value={selectedGradeGroupId}
-                  options={[
-                    { value: "", label: "Выберите группу" },
-                    ...groups.map((group) => ({ value: group._id, label: group.name })),
-                  ]}
-                  onChange={setSelectedGradeGroupId}
-                />
-              )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <SelectMenu
+                value={selectedGradeGroupId}
+                options={[
+                  { value: "", label: "Выберите группу" },
+                  ...groups.map((group) => ({ value: group._id, label: group.name })),
+                ]}
+                onChange={setSelectedGradeGroupId}
+              />
 
               <SelectMenu
                 value={selectedGradeStudentId}
@@ -1078,14 +1076,11 @@ export default function LmsPanel({ token, setError }: LmsPanelProps) {
               />
             </div>
 
-            {isHeadAdmin && !selectedGradeGroupId && (
+            {!selectedGradeGroupId && (
               <p className="text-sm text-slate-500">Сначала выберите группу, затем студента и задание.</p>
             )}
-            {isHeadAdmin && selectedGradeGroupId && studentsWithGrades.length === 0 && (
+            {selectedGradeGroupId && studentsWithGrades.length === 0 && (
               <p className="text-sm text-slate-500">В выбранной группе пока нет студентов с попытками.</p>
-            )}
-            {!isHeadAdmin && studentsWithGrades.length === 0 && (
-              <p className="text-sm text-slate-500">У студентов вашей группы пока нет попыток.</p>
             )}
             {selectedGradeStudentId && gradeAssignmentsForStudent.length === 0 && (
               <p className="text-sm text-slate-500">У выбранного студента пока нет заданий с попытками.</p>
