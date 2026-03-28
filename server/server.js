@@ -295,10 +295,6 @@ app.post("/register", async (req, res) => {
   try {
     let { username, password, fullName, phone, email, group } = req.body;
 
-    // Логируем ВСЁ, что пришло с фронта — это важно для отладки!
-    console.log("ЗАПРОС /register → тело:", req.body);
-
-    // Жёсткая проверка обязательных полей
     if (!username || typeof username !== 'string' || username.trim() === '') {
       return res.status(400).json({ message: "Поле username обязательно и не может быть пустым" });
     }
@@ -312,7 +308,6 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Выберите группу" });
     }
 
-    // Нормализация username и email
     username = username.trim().toLowerCase();
     if (email) email = email.trim().toLowerCase();
     group = group.trim();
@@ -322,7 +317,6 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Выбранная группа не найдена" });
     }
 
-    // Проверка уникальности без учёта регистра и пробелов
     const existByUsername = await User.findOne({
       username: { $regex: new RegExp(`^${username}$`, 'i') }
     });
@@ -332,7 +326,6 @@ app.post("/register", async (req, res) => {
     }) : null;
 
     if (existByUsername || existByEmail) {
-      console.log("Дубликат найден:", existByUsername?.username || existByEmail?.email);
       return res.status(409).json({ message: "Пользователь с таким логином или email уже существует" });
     }
 
@@ -347,7 +340,6 @@ app.post("/register", async (req, res) => {
 
     await user.save();
 
-    console.log("Успешно создан пользователь:", username);
     res.status(201).json({ message: "Регистрация прошла успешно" });
   } catch (err) {
     console.error("ОШИБКА РЕГИСТРАЦИИ:", err);
@@ -424,13 +416,7 @@ app.put("/profile", authenticate, async (req, res) => {
   }
 });
 
-// ──── Студент ────
-
-// ──── Админ ────
-
 app.use("/admin", authenticate, adminOnly);
-
-// ──── LMS (админ) ────
 
 app.get("/admin/courses", async (_req, res) => {
   try {
@@ -482,7 +468,6 @@ app.get("/admin/groups", async (req, res) => {
   try {
     let query = Group.find().populate("course", "title").sort({ createdAt: -1 });
     
-    // Regular admin sees only their own group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group) {
@@ -537,7 +522,6 @@ app.get("/admin/themes", async (req, res) => {
   try {
     let query = Theme.find().populate("course", "title").sort({ createdAt: -1 });
     
-    // Regular admin sees only themes of their group's course
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group").populate("group", "course");
       if (!adminUser?.group?.course) {
@@ -559,7 +543,6 @@ app.post("/admin/themes", async (req, res) => {
     const { title, description, course } = req.body;
     if (!title?.trim() || !course) return res.status(400).json({ message: "title и course обязательны" });
     
-    // Regular admin can only create themes for their group's course
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group").populate("group", "course");
       if (!adminUser?.group?.course || adminUser.group.course.toString() !== course) {
@@ -580,7 +563,6 @@ app.put("/admin/themes/:id", async (req, res) => {
     const theme = await Theme.findById(req.params.id);
     if (!theme) return res.status(404).json({ message: "Тема не найдена" });
     
-    // Regular admin can only edit themes of their group's course
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group").populate("group", "course");
       if (!adminUser?.group?.course || theme.course.toString() !== adminUser.group.course.toString()) {
@@ -601,7 +583,6 @@ app.delete("/admin/themes/:id", async (req, res) => {
     const theme = await Theme.findById(req.params.id);
     if (!theme) return res.status(404).json({ message: "Тема не найдена" });
     
-    // Regular admin can only delete themes of their group's course
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group").populate("group", "course");
       if (!adminUser?.group?.course || theme.course.toString() !== adminUser.group.course.toString()) {
@@ -670,7 +651,6 @@ app.get("/admin/assignments", async (req, res) => {
       .populate("category", "name")
       .sort({ createdAt: -1 });
     
-    // Regular admin sees only assignments of their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group) {
@@ -691,7 +671,6 @@ app.post("/admin/assignments", async (req, res) => {
   try {
     const { group } = req.body;
     
-    // Regular admin can only create assignments for their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || adminUser.group.toString() !== group) {
@@ -716,7 +695,6 @@ app.put("/admin/assignments/:id", async (req, res) => {
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
     
-    // Regular admin can only edit assignments of their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || assignment.group.toString() !== adminUser.group.toString()) {
@@ -741,7 +719,6 @@ app.delete("/admin/assignments/:id", async (req, res) => {
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) return res.status(404).json({ message: "Задание не найдено" });
     
-    // Regular admin can only delete assignments of their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || assignment.group.toString() !== adminUser.group.toString()) {
@@ -800,7 +777,6 @@ app.get("/admin/grades", async (req, res) => {
     
     let rows = await query.lean();
     
-    // Regular admin sees only their group's submissions
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group) {
@@ -825,7 +801,6 @@ app.put("/admin/grades/:id", async (req, res) => {
     const submission = await Submission.findById(req.params.id).populate("student", "group").populate("assignment", "maxScore");
     if (!submission) return res.status(404).json({ message: "Отправка не найдена" });
 
-    // Regular admin can only grade submissions from their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || submission.student.group.toString() !== adminUser.group.toString()) {
@@ -861,7 +836,6 @@ app.post("/admin/grades/:id/recalculate", async (req, res) => {
       return res.status(400).json({ message: "Пересчёт доступен только для тестов" });
     }
 
-    // Regular admin can only recalculate grades from their group
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || submission.student.group.toString() !== adminUser.group.toString()) {
@@ -893,7 +867,6 @@ app.post("/admin/assignments/:assignmentId/retake/:studentId", async (req, res) 
     const student = await User.findById(studentId).select("group");
     if (!student) return res.status(404).json({ message: "Студент не найден" });
 
-    // Regular admin can only create retakes for their group's students
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
       if (!adminUser?.group || student.group.toString() !== adminUser.group.toString()) {
@@ -932,7 +905,6 @@ app.post("/admin/assignments/:assignmentId/retake/:studentId", async (req, res) 
 
 app.get("/admin/dashboard-lms", async (req, res) => {
   try {
-    // For regular admin, filter by their group
     let groupFilter = {};
     if (req.user.role === "admin") {
       const adminUser = await User.findById(req.user._id).select("group");
@@ -960,7 +932,6 @@ app.get("/admin/dashboard-lms", async (req, res) => {
       Group.find(groupFilter).lean(),
     ]);
 
-    // For admin, filter submissions to their group's students
     let filteredSubmissions = submissions;
     if (req.user.role === "admin") {
       const studentIds = students.map(s => s._id.toString());
@@ -1002,21 +973,8 @@ app.get("/admin/dashboard-lms", async (req, res) => {
         status: s.status,
         finalScore: s.finalScore || 0,
         updatedAt: s.updatedAt,
-        student: s.student
-          ? {
-              _id: s.student._id,
-              fullName: s.student.fullName,
-              username: s.student.username,
-            }
-          : null,
-        assignment: s.assignment
-          ? {
-              _id: s.assignment._id,
-              title: s.assignment.title,
-              type: s.assignment.type,
-              deadline: s.assignment.deadline,
-            }
-          : null,
+        student: s.student ? { _id: s.student._id, fullName: s.student.fullName, username: s.student.username } : null,
+        assignment: s.assignment ? { _id: s.assignment._id, title: s.assignment.title, type: s.assignment.type, deadline: s.assignment.deadline } : null,
       }));
 
     const overdueAssignmentsList = filteredSubmissions
@@ -1030,21 +988,8 @@ app.get("/admin/dashboard-lms", async (req, res) => {
         submissionId: s._id,
         status: s.status,
         updatedAt: s.updatedAt,
-        student: s.student
-          ? {
-              _id: s.student._id,
-              fullName: s.student.fullName,
-              username: s.student.username,
-            }
-          : null,
-        assignment: s.assignment
-          ? {
-              _id: s.assignment._id,
-              title: s.assignment.title,
-              type: s.assignment.type,
-              deadline: s.assignment.deadline,
-            }
-          : null,
+        student: s.student ? { _id: s.student._id, fullName: s.student.fullName, username: s.student.username } : null,
+        assignment: s.assignment ? { _id: s.assignment._id, title: s.assignment.title, type: s.assignment.type, deadline: s.assignment.deadline } : null,
       }));
 
     const studentGrades = students.map((student) => {
@@ -1081,8 +1026,6 @@ app.get("/admin/dashboard-lms", async (req, res) => {
     res.status(500).json({ message: "Ошибка LMS dashboard" });
   }
 });
-
-// ──── LMS (студент) ────
 
 app.get("/student/courses", authenticate, studentOnly, async (req, res) => {
   try {
@@ -1267,13 +1210,20 @@ app.get("/student/grades", authenticate, studentOnly, async (req, res) => {
   }
 });
 
-// Список пользователей (админ)
 app.get("/admin/users", async (req, res) => {
   try {
     const hasHeadAdmin = await User.exists({ role: "head_admin" });
     const canManageAdminRoles = req.user.role === "head_admin" || (!hasHeadAdmin && req.user.role === "admin");
 
-    const users = await User.find()
+    let query = User.find();
+    
+    // Regular admin sees only students from their group
+    if (req.user.role === "admin") {
+      const adminUser = await User.findById(req.user._id).select("group");
+      query = query.where("role").equals("student").where("group").equals(adminUser?.group);
+    }
+    
+    const users = await query
       .populate("group", "name course")
       .select("-password")
       .sort({ createdAt: -1 })
@@ -1297,7 +1247,6 @@ app.get("/admin/users", async (req, res) => {
   }
 });
 
-// Смена роли пользователя (админ)
 app.put("/admin/users/:id", async (req, res) => {
   try {
     const { role, group } = req.body;
@@ -1340,7 +1289,6 @@ app.put("/admin/users/:id", async (req, res) => {
       updates.role = role;
     }
     if (group !== undefined) {
-      // Don't allow admin/head_admin to change their group
       if (["admin", "head_admin"].includes(targetUser.role) || ["admin", "head_admin"].includes(role)) {
         return res.status(403).json({ message: "Администраторы не могут менять свою группу" });
       }
