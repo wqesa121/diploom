@@ -2,9 +2,14 @@ import { Navigate, Outlet } from "react-router-dom";
 
 export default function ProtectedRoute() {
   const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (["admin", "head_admin"].includes(user.role)) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;

@@ -20,6 +20,9 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  const getDefaultRoute = (role?: string) =>
+    ["admin", "head_admin"].includes(role || "") ? "/admin" : "/lms";
+
   useEffect(() => {
     const loadGroups = async () => {
       try {
@@ -71,8 +74,16 @@ export default function Register() {
         throw new Error(data.message || "Ошибка регистрации");
       }
 
-      setSuccess("Регистрация успешна! Перенаправляем на вход...");
-      setTimeout(() => navigate("/login"), 1500);
+      if (data.token && data.user) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setSuccess("Регистрация успешна! Перенаправляем...");
+        setTimeout(() => navigate(getDefaultRoute(data.user.role), { replace: true }), 600);
+        return;
+      }
+
+      setSuccess("Регистрация успешна! Перенаправляем...");
+      setTimeout(() => navigate("/login", { replace: true }), 600);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Не удалось зарегистрироваться");
     } finally {

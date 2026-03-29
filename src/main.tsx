@@ -15,7 +15,29 @@ import Register from './Pages/Register.tsx'
 import LmsStudent from './Pages/LmsStudent.tsx'
 import AdminPanel from './Pages/AdminPanel.tsx'
 
-const token = localStorage.getItem("token")
+const getDefaultRoute = () => {
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    return '/login'
+  }
+
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    return ['admin', 'head_admin'].includes(user.role) ? '/admin' : '/lms'
+  } catch {
+    return '/login'
+  }
+}
+
+function RootRedirect() {
+  return <Navigate to={getDefaultRoute()} replace />
+}
+
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('token')
+  return token ? <Navigate to={getDefaultRoute()} replace /> : <>{children}</>
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -24,9 +46,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Header />
         <main className="flex-grow">
           <Routes>
-            <Route path="/" element={token ? <Navigate to="/lms" replace /> : <Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+            <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
 
             {/* Только для авторизованных */}
             <Route element={<ProtectedRoute />}>

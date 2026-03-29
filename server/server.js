@@ -340,7 +340,20 @@ app.post("/register", async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({ message: "Регистрация прошла успешно" });
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "7d" });
+
+    res.status(201).json({
+      message: "Регистрация прошла успешно",
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (err) {
     console.error("ОШИБКА РЕГИСТРАЦИИ:", err);
     res.status(500).json({ message: "Ошибка сервера при регистрации" });
