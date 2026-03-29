@@ -115,7 +115,8 @@ export default function UserList({ token, setError }: UserListProps) {
   };
 
   const deleteUser = async (user: User) => {
-    const confirmDelete = window.confirm(`Удалить пользователя ${user.fullName || user.username}?`);
+    const actionText = currentUser?.role === "admin" ? "Убрать из группы" : "Удалить";
+    const confirmDelete = window.confirm(`${actionText} пользователя ${user.fullName || user.username}?`);
     if (!confirmDelete) return;
 
     try {
@@ -141,7 +142,7 @@ export default function UserList({ token, setError }: UserListProps) {
       }
 
       setUsers((prev) => prev.filter((u) => u._id !== user._id));
-      toast.success("Пользователь удалён", {
+      toast.success(currentUser?.role === "admin" ? "Пользователь убран из группы" : "Пользователь удалён", {
         position: "top-right",
         autoClose: 3000,
         hideProgressBar: true,

@@ -1367,6 +1367,11 @@ app.delete("/admin/users/:id", async (req, res) => {
       return res.status(403).json({ message: "Только head admin может удалять администраторов" });
     }
 
+    if (req.user.role === "admin") {
+      await User.findByIdAndUpdate(req.params.id, { group: null });
+      return res.json({ message: "Пользователь убран из группы" });
+    }
+
     await Submission.deleteMany({ student: req.params.id });
     await User.findByIdAndDelete(req.params.id);
 
