@@ -303,7 +303,7 @@ export default function UserList({ token, setError }: UserListProps) {
                         disabled={user._id === currentUserId}
                         className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Удалить
+                        {currentUser?.role === "admin" ? "Убрать из группы" : "Удалить"}
                       </button>
                       )}
                     </div>
@@ -317,7 +317,7 @@ export default function UserList({ token, setError }: UserListProps) {
       )}
       {!canManageAdminRoles && (
         <p className="mt-3 text-xs text-slate-500">
-          Вы можете просматривать онлайн-статус и удалять пользователей, но назначение админских ролей доступно только head admin.
+          Вы можете просматривать онлайн-статус и убирать студентов из своей группы, но назначение админских ролей доступно только head admin.
         </p>
       )}
     </div>
