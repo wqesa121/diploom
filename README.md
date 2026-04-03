@@ -58,7 +58,33 @@ npm run dev
 
 ## Переменные окружения
 
-См. `.env.example`. Для совместимости поддерживаются оба ключа подключения к MongoDB: `MONGO_URI` и `MONGODB_URI`.
+См. `.env.example`.
+
+Что важно:
+
+- поддерживаются оба ключа подключения к MongoDB: `MONGO_URI` и `MONGODB_URI`;
+- `AUTH_SECRET` обязателен для Auth.js;
+- если в старом окружении уже есть только `JWT_SECRET`, приложение умеет использовать его как fallback;
+- `GOOGLE_GENERATIVE_AI_API_KEY` и `UNSPLASH_ACCESS_KEY` нужны только для AI-кнопки генерации.
+
+## Первый запуск
+
+1. Убедитесь, что в `.env` задана рабочая MongoDB строка.
+2. Добавьте `AUTH_SECRET`.
+3. При необходимости оставьте старый `MONGODB_URI` без изменений: приложение его поддерживает.
+4. Создайте первого администратора:
+
+```bash
+npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin"
+```
+
+5. Запустите dev-сервер:
+
+```bash
+npm run dev
+```
+
+6. Откройте `/login` и войдите под созданным аккаунтом.
 
 ## Основные маршруты
 
@@ -69,48 +95,16 @@ npm run dev
 - `/api/posts` — headless API списка публикаций
 - `/api/posts/[slug]` — headless API одной публикации
 
----
+## Что уже реализовано
 
-## 10. Сервер и API
-
-Основной серверный файл: server.js  
-Дополнительная документация по API: LMS_API_TODAY.md
-
-Сервер включает:
-
-- маршруты и бизнес-логику;
-- middleware-проверки;
-- модельный слой;
-- обработку загрузок и файлов.
-
----
-
-## 11. Smoke-тесты
-
-Для ручной проверки используйте:
-
-- SMOKE_TEST_CHECKLIST.md
-
-Рекомендуется проверять:
-
-- регистрацию/вход;
-- ролевые ограничения;
-- операции в админ-панели;
-- зачисления и отображение данных студента;
-- корректность API-ответов.
-
----
-
-## 12. Дорожная карта
-
-- добавить unit/integration тесты ключевых модулей;
-- усилить обработку ошибок на клиенте и сервере;
-- улучшить мониторинг и логирование;
-- расширить мобильную адаптацию интерфейса;
-- добавить продвинутую аналитику по кружкам и успеваемости.
-
----
+- защищенная admin-зона через Auth.js middleware;
+- credentials login с MongoDB adapter;
+- Article model на Mongoose;
+- AI generation endpoint для title, meta, slug, markdown, tags и image query;
+- интеграция с Unsplash для 5-6 изображений;
+- headless API для published-постов;
+- Tiptap editor и AI-first article form.
 
 ## Репозиторий
 
-GitHub: https://github.com/wqesa121/lms_fomin.d.git
+GitHub: https://github.com/wqesa121/diploom
