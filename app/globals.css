@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --background: 193 38% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 175 84% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 16%;
+  --muted: 210 40% 94%;
+  --muted-foreground: 215 16% 40%;
+  --accent: 44 92% 90%;
+  --accent-foreground: 25 95% 22%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 214 32% 88%;
+  --input: 214 32% 88%;
+  --ring: 175 84% 32%;
+  --radius: 1rem;
+  --sidebar: 210 40% 98%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-muted: 215 25% 45%;
+  --sidebar-border: 214 32% 88%;
+  --sidebar-accent: 175 84% 95%;
+}
+
+* {
+  @apply border-border;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 22%),
+    radial-gradient(circle at top right, rgba(250, 204, 21, 0.18), transparent 18%),
+    linear-gradient(to bottom, rgba(255,255,255,0.65), rgba(241,245,249,0.95));
+  min-height: 100vh;
+}
+
+.tiptap {
+  @apply min-h-[320px] rounded-b-lg border border-t-0 bg-white px-4 py-3 text-sm leading-7 shadow-sm;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap h1 {
+  @apply mb-4 mt-6 text-3xl font-semibold;
+}
+
+.tiptap h2 {
+  @apply mb-3 mt-5 text-2xl font-semibold;
+}
+
+.tiptap h3 {
+  @apply mb-2 mt-4 text-xl font-semibold;
+}
+
+.tiptap ul {
+  @apply my-4 list-disc pl-6;
+}
+
+.tiptap ol {
+  @apply my-4 list-decimal pl-6;
+}
+
+.tiptap blockquote {
+  @apply my-4 border-l-4 border-primary/40 pl-4 italic text-muted-foreground;
+}
+
+.tiptap a {
+  @apply text-primary underline underline-offset-4;
+}

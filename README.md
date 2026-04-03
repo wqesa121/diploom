@@ -1,252 +1,73 @@
-# Student Circles LMS
+# NeuraCMS
 
-Современная full-stack платформа для учебных кружков и LMS-сценариев: управление кружками, зачислениями, курсами, оценками и ролевым доступом (студент/преподаватель/администратор).
+NeuraCMS — современная headless CMS на Next.js 15 с MongoDB, Auth.js, Tiptap и встроенным AI-генератором SEO-контента на базе Gemini. Проект ориентирован на контент-команды, которым нужен быстрый production-ready бэкофис и публичный headless API без платной инфраструктуры.
 
-## Содержание
+## Стек
 
-1. О проекте
-2. Основные возможности
-3. Технологии и стек
-4. Архитектура
-5. Структура проекта
-6. Установка и запуск
-7. Переменные окружения
-8. Скрипты
-9. Роли и страницы
-10. Сервер и API
-11. Smoke-тесты
-12. Дорожная карта
+- Next.js 15 App Router, Server Components, Server Actions
+- TypeScript strict mode
+- Tailwind CSS, shadcn/ui, Radix UI, lucide-react
+- MongoDB Atlas + Mongoose
+- Auth.js v5 + MongoDB adapter + Credentials provider
+- Google Generative AI SDK + Gemini Flash
+- Unsplash API free tier
+- Zod
+- Tiptap headless editor
 
----
-
-## 1. О проекте
-
-**Student Circles LMS** — это веб-приложение для образовательной среды, в котором можно:
-
-- публиковать и администрировать кружки;
-- управлять зачислениями студентов;
-- вести учебные данные в формате LMS;
-- отображать личные курсы, зачисления и оценки;
-- гибко ограничивать доступ по ролям.
-
-Проект разделен на клиентскую и серверную части.
-
----
-
-## 2. Основные возможности
-
-### Для студентов
-
-- просмотр списка кружков и карточки кружка;
-- просмотр собственных кружков;
-- просмотр зачислений;
-- просмотр оценок;
-- страницы LMS для студента.
-
-### Для преподавателей
-
-- доступ к LMS-интерфейсам преподавателя;
-- работа с учебными данными в рамках своей роли.
-
-### Для администраторов
-
-- административная панель;
-- управление кружками;
-- управление зачислениями;
-- управление пользователями;
-- статистика и вспомогательные модули.
-
-### Системные
-
-- защита маршрутов по авторизации и ролям;
-- модальные интерфейсы (например, исключение участника);
-- чат внутри кружка;
-- серверный API и middleware;
-- загрузка/хранение файлов на сервере.
-
----
-
-## 3. Технологии и стек
-
-### Frontend
-
-- **React** — UI и компонентная архитектура;
-- **TypeScript** — строгая типизация;
-- **Vite** — быстрый dev/build;
-- **React Router** — маршрутизация;
-- **Tailwind CSS** — стилизация;
-- **PostCSS** — обработка CSS;
-- кастомные UI-компоненты (`src/components/ui`).
-
-### Backend
-
-- **Node.js**;
-- **Express.js**;
-- middleware-слой (`server/middleware`);
-- модельный слой (`server/models`);
-- файловые загрузки (`server/uploads`).
-
-### Качество и конфигурация
-
-- **ESLint** — линтинг;
-- `tsconfig`-конфиги для разных целей;
-- `SMOKE_TEST_CHECKLIST.md` для ручной проверки.
-
----
-
-## 4. Архитектура
-
-Приложение состоит из двух зон:
-
-1. **Клиент (`src`)**  
-   Интерфейс, страницы, роутинг, вызовы API.
-
-2. **Сервер (`server`)**  
-   API, бизнес-логика, middleware, модели, загрузки.
-
-Поток работы:
-
-- пользователь взаимодействует с React-интерфейсом;
-- клиент отправляет запросы на сервер;
-- сервер проверяет доступ, обрабатывает данные и возвращает ответ;
-- клиент отображает результат с учетом роли пользователя.
-
----
-
-## 5. Структура проекта
+## Оптимальная структура
 
 ```text
-student-circles/
-├─ public/
-├─ server/
-│  ├─ middleware/
-│  ├─ models/
-│  ├─ uploads/
-│  ├─ LMS_API_TODAY.md
-│  └─ server.js
-├─ src/
-│  ├─ api/
-│  ├─ assets/
-│  ├─ components/
-│  │  ├─ admin/
-│  │  └─ ui/
-│  ├─ Pages/
-│  ├─ index.css
-│  └─ main.tsx
-├─ index.html
-├─ package.json
-├─ tailwind.config.js
-├─ postcss.config.js
-├─ vite.config.ts
-├─ tsconfig.json
-├─ tsconfig.app.json
-├─ tsconfig.node.json
-├─ eslint.config.js
-└─ SMOKE_TEST_CHECKLIST.md
+app/
+   (auth)/login
+   (admin)/admin
+   api/auth/[...nextauth]
+   api/admin/ai/generate
+   api/posts
+actions/
+components/
+   admin/
+   auth/
+   editor/
+   ui/
+lib/
+models/
+scripts/
+types/
 ```
 
----
+## Возможности
 
-## 6. Установка и запуск
+- защищенная админ-панель с боковой навигацией;
+- CRUD для статей;
+- draft / published workflow;
+- AI-генерация title, meta description, slug, markdown, tags и image query;
+- автоподбор 5-6 изображений из Unsplash;
+- публичный API `GET /api/posts` и `GET /api/posts/[slug]`;
+- rich text editor на Tiptap;
+- автоматический SEO score.
 
-### Требования
-
-- Node.js 18+ (рекомендуется LTS);
-- npm 9+.
-
-### Установка зависимостей
+## Быстрый старт
 
 ```bash
 npm install
-```
-
-### Запуск frontend (режим разработки)
-
-```bash
+npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin"
 npm run dev
 ```
 
-Обычно фронтенд доступен по адресу: `http://localhost:5173`.
+Откройте `http://localhost:3000/login`.
 
-### Запуск backend
+## Переменные окружения
 
-Если в package.json есть отдельный серверный скрипт — используйте его.  
-Если нет, можно запустить напрямую:
+См. `.env.example`. Для совместимости поддерживаются оба ключа подключения к MongoDB: `MONGO_URI` и `MONGODB_URI`.
 
-```bash
-node server/server.js
-```
+## Основные маршруты
 
----
-
-## 7. Переменные окружения
-
-Создайте файл `.env` и вынесите туда чувствительные параметры:
-
-- URL API;
-- порт сервера;
-- секреты токенов;
-- настройки БД (если используются).
-
-Пример:
-
-```env
-VITE_API_URL=http://localhost:3000
-PORT=3000
-JWT_SECRET=change_me
-```
-
-Важно:
-
-- не коммитьте `.env` в git;
-- добавьте `.env` и `.env.*` в .gitignore.
-
----
-
-## 8. Скрипты
-
-Проверьте актуальные команды в package.json. Обычно:
-
-- `npm run dev` — запуск frontend в dev-режиме;
-- `npm run build` — production-сборка;
-- `npm run preview` — предпросмотр сборки;
-- `npm run lint` — линтинг.
-
----
-
-## 9. Роли и страницы
-
-### Базовые страницы
-
-- `Login`
-- `Register`
-- `CirclesList`
-- `CircleDetail`
-
-### Личный кабинет студента
-
-- `MyCircles`
-- `MyEnrollments`
-- `MyGrades`
-- `LmsStudent`
-
-### Преподаватель
-
-- `TeacherLms`
-
-### Администрирование
-
-- `AdminPanel`
-- `CircleList`, `CircleModal`
-- `EnrollmentList`, `EnrollmentModal`
-- `UserList`
-- `Stats`
-- `LmsPanel`
-
-### Контроль доступа
-
-- `ProtectedRoute` — доступ только авторизованным;
-- `AdminRoute` — доступ только администраторам.
+- `/login` — вход в админку
+- `/admin` — dashboard
+- `/admin/articles` — список статей
+- `/admin/articles/new` — создание статьи
+- `/api/posts` — headless API списка публикаций
+- `/api/posts/[slug]` — headless API одной публикации
 
 ---
 
