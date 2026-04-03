@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import "server-only";
 
 import { getMongoUri } from "@/lib/env";
 
