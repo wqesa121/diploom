@@ -1,9 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Bot, Images, SearchCheck } from "lucide-react";
 
 import { auth } from "@/auth";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPublishedArticles } from "@/lib/articles";
+import { formatRelativeDate } from "@/lib/utils";
 
 const features = [
   {
@@ -25,9 +29,10 @@ const features = [
 
 export default async function HomePage() {
   const session = await auth();
+  const { data: latestPosts } = await getPublishedArticles({ page: 1, limit: 3 });
 
   return (
-    <main className="container flex min-h-screen flex-col justify-center py-16">
+    <main className="container space-y-16 py-16">
       <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <section className="space-y-8">
           <div className="inline-flex w-fit items-center rounded-full border border-primary/15 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -51,6 +56,9 @@ export default async function HomePage() {
             <Button asChild size="lg" variant="outline">
               <Link href="/api/posts">Открыть headless API</Link>
             </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/posts">Читать публикации</Link>
+            </Button>
           </div>
         </section>
         <section className="grid gap-4">
@@ -73,6 +81,69 @@ export default async function HomePage() {
           })}
         </section>
       </div>
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              Latest Published Content
+            </div>
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Последние опубликованные статьи</h2>
+            <p className="max-w-2xl text-muted-foreground">
+              Главная страница теперь показывает реальные материалы из CMS, а не только промо-блоки. Это уже готовый public-facing слой поверх headless API.
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/posts">
+              Все публикации
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+
+        {latestPosts.length === 0 ? (
+          <Card className="border-dashed bg-white/70">
+            <CardContent className="p-10 text-center text-muted-foreground">
+              Пока нет опубликованных статей. Опубликуйте первую статью из админки, чтобы она появилась здесь.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-3">
+            {latestPosts.map((post) => (
+              <Card key={post.id} className="overflow-hidden border-white/70 bg-white/85">
+                {post.featuredImage ? (
+                  <div className="relative aspect-[4/3] bg-secondary">
+                    <Image src={post.featuredImage} alt={post.title} fill className="object-cover" unoptimized />
+                  </div>
+                ) : null}
+                <CardHeader className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {post.tags.slice(0, 3).map((tag) => (
+                      <Badge key={tag} variant="outline">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  <CardTitle className="line-clamp-2 text-2xl">{post.title}</CardTitle>
+                  <CardDescription className="line-clamp-3 leading-6">{post.excerpt}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{post.author.name}</span>
+                    <span>{formatRelativeDate(post.updatedAt)}</span>
+                  </div>
+                  <Button asChild className="w-full">
+                    <Link href={`/posts/${post.slug}`}>
+                      Открыть статью
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }

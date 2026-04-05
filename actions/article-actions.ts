@@ -77,6 +77,8 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
   revalidatePath("/admin");
   revalidatePath("/admin/articles");
   revalidatePath("/api/posts");
+  revalidatePath("/");
+  revalidatePath("/posts");
   redirect("/admin/articles");
 
   return { success: true };
@@ -120,7 +122,11 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
   revalidatePath("/admin");
   revalidatePath("/admin/articles");
   revalidatePath(`/admin/articles/${id}/edit`);
+  revalidatePath(`/admin/articles/${id}/preview`);
   revalidatePath(`/api/posts/${parsed.data.slug}`);
+  revalidatePath("/");
+  revalidatePath("/posts");
+  revalidatePath(`/posts/${parsed.data.slug}`);
   redirect("/admin/articles");
 
   return { success: true };
@@ -137,4 +143,6 @@ export async function deleteArticleAction(id: string) {
   await Article.findByIdAndDelete(id);
   revalidatePath("/admin");
   revalidatePath("/admin/articles");
+  revalidatePath("/");
+  revalidatePath("/posts");
 }

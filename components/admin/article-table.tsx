@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 
 import { deleteArticleAction } from "@/actions/article-actions";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,12 @@ export function ArticleTable({ articles }: ArticleTableProps) {
             <TableCell>{formatRelativeDate(article.updatedAt)}</TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
+                <Button asChild variant="secondary" size="sm">
+                  <Link href={`/admin/articles/${article.id}/preview`}>
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </Link>
+                </Button>
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/admin/articles/${article.id}/edit`}>
                     <Pencil className="h-4 w-4" />
