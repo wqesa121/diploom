@@ -18,7 +18,18 @@ export type ArticleActionState = {
 type DeletedArticleShape = {
   title: string;
   slug: string;
+  featured?: boolean;
 };
+
+type BulkActionType = "publish" | "draft" | "delete";
+
+function revalidateArticleSurfaces() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/articles");
+  revalidatePath("/");
+  revalidatePath("/posts");
+  revalidatePath("/api/posts");
+}
 
 function normalizeArray(formData: FormData, key: string) {
   return formData
@@ -98,11 +109,7 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     details: `${parsed.data.status === "published" ? "Article created as published." : "Article created as draft."}${parsed.data.featured ? " Marked as featured." : ""}`,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/articles");
-  revalidatePath("/api/posts");
-  revalidatePath("/");
-  revalidatePath("/posts");
+  revalidateArticleSurfaces();
   redirect("/admin/articles");
 
   return { success: true };
@@ -161,13 +168,10 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
       : `Status: ${parsed.data.status}.${parsed.data.featured ? " Featured enabled." : ""}`,
   });
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/articles");
+  revalidateArticleSurfaces();
   revalidatePath(`/admin/articles/${id}/edit`);
   revalidatePath(`/admin/articles/${id}/preview`);
   revalidatePath(`/api/posts/${parsed.data.slug}`);
-  revalidatePath("/");
-  revalidatePath("/posts");
   revalidatePath(`/posts/${parsed.data.slug}`);
   redirect("/admin/articles");
 
@@ -198,8 +202,74 @@ export async function deleteArticleAction(id: string) {
     });
   }
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/articles");
-  revalidatePath("/");
-  revalidatePath("/posts");
+  revalidateArticleSurfaces();
+}
+
+export async function bulkArticleAction(formData: FormData) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  const actionType = String(formData.get("bulkAction") || "") as BulkActionType;
+  const articleIds = formData
+    .getAll("articleIds")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+
+  if (!articleIds.length || !["publish", "draft", "delete"].includes(actionType)) {
+    redirect("/admin/articles");
+  }
+
+  await connectToDatabase();
+
+  const articles = await Article.find({ _id: { $in: articleIds } })
+    .select("title slug featured")
+    .lean<Array<DeletedArticleShape & { _id: unknown }>>();
+
+  if (actionType === "delete") {
+    await Article.deleteMany({ _id: { $in: articleIds } });
+
+    for (const article of articles) {
+      await logActivity({
+        actorId: session.user.id,
+        actorName: session.user.name,
+        actorEmail: session.user.email,
+        entityType: "article",
+        entityId: String(article._id),
+        entityTitle: article.title,
+        action: "deleted",
+        details: `Deleted article /${article.slug} via bulk action.`,
+      });
+    }
+  } else {
+    const nextStatus = actionType === "publish" ? "published" : "draft";
+    const updatePayload: Record<string, unknown> = { status: nextStatus };
+
+    if (nextStatus === "draft") {
+      updatePayload.featured = false;
+    }
+
+    await Article.updateMany({ _id: { $in: articleIds } }, { $set: updatePayload });
+
+    for (const article of articles) {
+      await logActivity({
+        actorId: session.user.id,
+        actorName: session.user.name,
+        actorEmail: session.user.email,
+        entityType: "article",
+        entityId: String(article._id),
+        entityTitle: article.title,
+        action: "updated",
+        details:
+          actionType === "publish"
+            ? "Moved to published via bulk action."
+            : "Moved to draft via bulk action.",
+      });
+    }
+  }
+
+  revalidateArticleSurfaces();
+  redirect("/admin/articles");
 }
