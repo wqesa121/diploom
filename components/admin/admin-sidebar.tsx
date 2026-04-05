@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, FileText, Home, KeyRound, Sparkles } from "lucide-react";
+import { BarChart3, FileText, Home, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/admin", label: "Dashboard", icon: Home },
   { href: "/admin/articles", label: "Articles", icon: FileText },
+  { href: "/admin/review", label: "Review Queue", icon: ShieldCheck },
   { href: "/admin/articles/new", label: "Generate + Create", icon: Sparkles },
   { href: "/admin/account", label: "Account Security", icon: KeyRound },
 ];
