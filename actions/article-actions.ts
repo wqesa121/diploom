@@ -35,13 +35,13 @@ type RevisionArticleShape = {
   featuredImage?: string;
   additionalImages?: string[];
   imageQuery?: string;
-  status: "draft" | "published";
+  status: "draft" | "in_review" | "published";
   featured?: boolean;
   scheduledAt?: Date | string | null;
   seoScore?: number;
 };
 
-type BulkActionType = "publish" | "draft" | "delete";
+type BulkActionType = "publish" | "review" | "draft" | "delete";
 
 function revalidateArticleSurfaces() {
   revalidatePath("/admin");
@@ -99,6 +99,7 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
   }
 
   const content = JSON.parse(parsed.data.content);
+  const normalizedFeatured = parsed.data.status === "published" ? parsed.data.featured : false;
   const seoScore = estimateSeoScore({
     title: parsed.data.metaTitle,
     metaDescription: parsed.data.metaDescription,
@@ -106,12 +107,13 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     tags: parsed.data.tags,
   });
 
-  if (parsed.data.featured) {
+  if (normalizedFeatured) {
     await Article.updateMany({ featured: true }, { $set: { featured: false } });
   }
 
   const article = await Article.create({
     ...parsed.data,
+    featured: normalizedFeatured,
     content,
     scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
     author: session.user.id,
@@ -126,7 +128,7 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     entityId: String(article._id),
     entityTitle: parsed.data.title,
     action: "created",
-    details: `${parsed.data.status === "published" ? "Article created as published." : "Article created as draft."}${parsed.data.featured ? " Marked as featured." : ""}`,
+    details: `Article created with status ${parsed.data.status}.${normalizedFeatured ? " Marked as featured." : ""}`,
   });
 
   await createArticleRevision({
@@ -163,6 +165,7 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
   }
 
   const content = JSON.parse(parsed.data.content);
+  const normalizedFeatured = parsed.data.status === "published" ? parsed.data.featured : false;
   const seoScore = estimateSeoScore({
     title: parsed.data.metaTitle,
     metaDescription: parsed.data.metaDescription,
@@ -170,12 +173,13 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
     tags: parsed.data.tags,
   });
 
-  if (parsed.data.featured) {
+  if (normalizedFeatured) {
     await Article.updateMany({ _id: { $ne: id }, featured: true }, { $set: { featured: false } });
   }
 
   await Article.findByIdAndUpdate(id, {
     ...parsed.data,
+    featured: normalizedFeatured,
     content,
     scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
     author: session.user.id,
@@ -191,8 +195,8 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
     entityTitle: parsed.data.title,
     action: "updated",
     details: parsed.data.scheduledAt
-      ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.${parsed.data.featured ? " Featured enabled." : ""}`
-      : `Status: ${parsed.data.status}.${parsed.data.featured ? " Featured enabled." : ""}`,
+      ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.${normalizedFeatured ? " Featured enabled." : ""}`
+      : `Status: ${parsed.data.status}.${normalizedFeatured ? " Featured enabled." : ""}`,
   });
 
   const updatedArticle = await Article.findById(id).lean<RevisionArticleShape | null>();
@@ -256,7 +260,7 @@ export async function bulkArticleAction(formData: FormData) {
     .map((value) => String(value).trim())
     .filter(Boolean);
 
-  if (!articleIds.length || !["publish", "draft", "delete"].includes(actionType)) {
+  if (!articleIds.length || !["publish", "review", "draft", "delete"].includes(actionType)) {
     redirect("/admin/articles");
   }
 
@@ -282,10 +286,10 @@ export async function bulkArticleAction(formData: FormData) {
       });
     }
   } else {
-    const nextStatus = actionType === "publish" ? "published" : "draft";
+    const nextStatus = actionType === "publish" ? "published" : actionType === "review" ? "in_review" : "draft";
     const updatePayload: Record<string, unknown> = { status: nextStatus };
 
-    if (nextStatus === "draft") {
+    if (nextStatus !== "published") {
       updatePayload.featured = false;
     }
 
@@ -303,7 +307,9 @@ export async function bulkArticleAction(formData: FormData) {
         details:
           actionType === "publish"
             ? "Moved to published via bulk action."
-            : "Moved to draft via bulk action.",
+            : actionType === "review"
+              ? "Moved to in-review via bulk action."
+              : "Moved to draft via bulk action.",
       });
     }
   }

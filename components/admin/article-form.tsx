@@ -43,7 +43,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
   const [featuredImage, setFeaturedImage] = useState(initialData?.featuredImage ?? "");
   const [additionalImagesInput, setAdditionalImagesInput] = useState(initialData?.additionalImages.join(", ") ?? "");
   const [imageQuery, setImageQuery] = useState(initialData?.imageQuery ?? "");
-  const [status, setStatus] = useState<"draft" | "published">(initialData?.status ?? "draft");
+  const [status, setStatus] = useState<"draft" | "in_review" | "published">(initialData?.status ?? "draft");
   const [featured, setFeatured] = useState(initialData?.featured ?? false);
   const [scheduledAt, setScheduledAt] = useState(initialData?.scheduledAt ? new Date(initialData.scheduledAt).toISOString().slice(0, 16) : "");
   const [topic, setTopic] = useState(initialData?.title ?? "");
@@ -148,12 +148,13 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={status} onValueChange={(value) => setStatus(value as "draft" | "published")}>
+                <Select value={status} onValueChange={(value) => setStatus(value as "draft" | "in_review" | "published")}>
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите статус" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="in_review">In review</SelectItem>
                     <SelectItem value="published">Published</SelectItem>
                   </SelectContent>
                 </Select>
@@ -167,7 +168,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
                   onChange={(event) => setScheduledAt(event.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Если указан будущий момент времени и статус = Published, статья появится на публичных страницах только после этой даты.
+                  Если указан будущий момент времени и статус = Published, статья появится на публичных страницах только после этой даты. Для `In review` материал остаётся внутренним.
                 </p>
               </div>
               <div className="space-y-3 md:col-span-2 rounded-[1.25rem] border bg-secondary/30 p-4">
@@ -180,7 +181,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
                 <label htmlFor="featuredToggle" className="flex items-center justify-between gap-4 rounded-[1rem] border bg-white px-4 py-3 text-sm">
                   <div>
                     <p className="font-medium text-slate-950">Использовать как featured content</p>
-                    <p className="text-xs text-muted-foreground">Работает как editor-picked hero для home и posts index.</p>
+                    <p className="text-xs text-muted-foreground">Работает как editor-picked hero для home и posts index. Доступно только для опубликованного контента.</p>
                   </div>
                   <input
                     id="featuredToggle"

@@ -15,7 +15,7 @@ type RevisionSnapshot = {
   featuredImage?: string;
   additionalImages?: string[];
   imageQuery?: string;
-  status: "draft" | "published";
+  status: "draft" | "in_review" | "published";
   featured?: boolean;
   scheduledAt?: Date | string | null;
   seoScore?: number;

@@ -24,7 +24,7 @@ type ArticleShape = {
   additionalImages?: string[];
   imageQuery?: string;
   author?: ArticleAuthorShape;
-  status: "draft" | "published";
+  status: "draft" | "in_review" | "published";
   featured?: boolean;
   scheduledAt?: Date | string | null;
   seoScore?: number;

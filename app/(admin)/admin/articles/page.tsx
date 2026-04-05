@@ -9,7 +9,7 @@ import { getAllArticles } from "@/lib/articles";
 type ArticlesPageProps = {
   searchParams: Promise<{
     search?: string;
-    status?: "draft" | "published" | "scheduled" | "all";
+    status?: "draft" | "in_review" | "published" | "scheduled" | "all";
     tag?: string;
     sort?: "updated-desc" | "updated-asc" | "seo-desc" | "seo-asc" | "scheduled-soon" | "title-asc";
     seo?: "all" | "strong" | "needs-work";
@@ -85,7 +85,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle>Content library</CardTitle>
-            <CardDescription>Управляйте всеми draft и published материалами из одного списка.</CardDescription>
+            <CardDescription>Управляйте draft, in review, scheduled и published материалами из одного списка.</CardDescription>
           </div>
           <Button asChild>
             <Link href="/admin/articles/new">Новая статья</Link>
@@ -113,6 +113,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
               >
                 <option value="all">Все</option>
                 <option value="draft">Draft</option>
+                <option value="in_review">In review</option>
                 <option value="published">Published</option>
                 <option value="scheduled">Scheduled</option>
               </select>

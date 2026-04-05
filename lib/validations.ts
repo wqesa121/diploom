@@ -32,7 +32,7 @@ export const articleSchema = z.object({
   featuredImage: z.string().url().or(z.literal("")),
   additionalImages: z.array(z.string().url()).max(6),
   imageQuery: z.string().max(120).optional().default(""),
-  status: z.enum(["draft", "published"]),
+  status: z.enum(["draft", "in_review", "published"]),
   featured: z.enum(["true", "false"]).transform((value) => value === "true"),
   scheduledAt: z
     .string()

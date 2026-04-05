@@ -1,4 +1,4 @@
-export type ArticleStatus = "draft" | "published";
+export type ArticleStatus = "draft" | "in_review" | "published";
 
 export type SerializedArticle = {
   id: string;

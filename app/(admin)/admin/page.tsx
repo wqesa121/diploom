@@ -38,6 +38,7 @@ export default async function AdminDashboardPage() {
     .filter((article) => article.status === "published" && article.scheduledAt && new Date(article.scheduledAt).getTime() > now)
     .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime());
   const draftArticles = articles.filter((article) => article.status === "draft");
+  const reviewArticles = articles.filter((article) => article.status === "in_review");
   const uniqueTags = new Set(articles.flatMap((article) => article.tags));
   const recentArticles = articles.slice(0, 5);
   const averageSeoScore = articles.length
@@ -80,6 +81,7 @@ export default async function AdminDashboardPage() {
           <CardContent className="space-y-3 text-sm text-slate-300">
             <p>Live now: {liveArticles.length}</p>
             <p>Scheduled queue: {scheduledArticles.length}</p>
+            <p>In review: {reviewArticles.length}</p>
             <p>Average SEO score: {averageSeoScore}/100</p>
           </CardContent>
         </Card>
@@ -90,6 +92,7 @@ export default async function AdminDashboardPage() {
         liveArticles={liveArticles.length}
         scheduledArticles={scheduledArticles.length}
         draftArticles={draftArticles.length}
+        reviewArticles={reviewArticles.length}
         totalTags={uniqueTags.size}
         averageSeoScore={averageSeoScore}
       />

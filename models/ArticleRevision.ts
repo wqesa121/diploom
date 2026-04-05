@@ -64,7 +64,7 @@ const articleRevisionSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "published"],
+      enum: ["draft", "in_review", "published"],
       required: true,
     },
     featured: {

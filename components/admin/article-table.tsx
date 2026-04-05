@@ -18,7 +18,7 @@ type ArticleTableProps = {
 export function ArticleTable({ articles }: ArticleTableProps) {
   const now = Date.now();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<"publish" | "draft" | "delete">("publish");
+  const [bulkAction, setBulkAction] = useState<"publish" | "review" | "draft" | "delete">("publish");
   const allSelected = useMemo(() => articles.length > 0 && selectedIds.length === articles.length, [articles.length, selectedIds.length]);
 
   if (!articles.length) {
@@ -49,10 +49,11 @@ export function ArticleTable({ articles }: ArticleTableProps) {
           <select
             name="bulkAction"
             value={bulkAction}
-            onChange={(event) => setBulkAction(event.target.value as "publish" | "draft" | "delete")}
+            onChange={(event) => setBulkAction(event.target.value as "publish" | "review" | "draft" | "delete")}
             className="flex h-11 min-w-[220px] rounded-2xl border bg-white px-4 py-2 text-sm shadow-sm outline-none transition-colors focus:border-primary"
           >
             <option value="publish">Publish selected</option>
+            <option value="review">Move selected to in review</option>
             <option value="draft">Move selected to draft</option>
             <option value="delete">Delete selected</option>
           </select>

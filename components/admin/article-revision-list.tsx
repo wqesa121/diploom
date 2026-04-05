@@ -13,7 +13,7 @@ type ArticleRevisionListProps = {
     revision: number;
     title: string;
     slug: string;
-    status: "draft" | "published";
+    status: "draft" | "in_review" | "published";
     featured: boolean;
     seoScore: number;
     editorName: string;
