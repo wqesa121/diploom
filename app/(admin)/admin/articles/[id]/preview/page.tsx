@@ -6,6 +6,7 @@ import { ArrowLeft, FilePenLine } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExternalPreviewActions } from "@/components/admin/external-preview-actions";
 import { getPreviewToken } from "@/lib/env";
 import { getArticleById } from "@/lib/articles";
 import { markdownToHtml } from "@/lib/markdown";
@@ -117,6 +118,18 @@ export default async function ArticlePreviewPage({ params }: ArticlePreviewPageP
               <p>External preview: {externalPreviewHref ? "enabled" : "disabled (set PREVIEW_TOKEN)"}</p>
             </CardContent>
           </Card>
+
+          {externalPreviewHref ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Share preview</CardTitle>
+                <CardDescription>Скопируйте или отправьте приватную ссылку на внешний preview.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ExternalPreviewActions href={externalPreviewHref} />
+              </CardContent>
+            </Card>
+          ) : null}
         </aside>
       </article>
     </div>
