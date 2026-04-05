@@ -1,13 +1,29 @@
 import Link from "next/link";
-import { ArrowRight, Clock3, FilePenLine } from "lucide-react";
+import { ArrowRight, Clock3, FilePenLine, History } from "lucide-react";
 
 import { auth } from "@/auth";
 import { DashboardMetrics } from "@/components/admin/dashboard-metrics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRecentActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { formatRelativeDate } from "@/lib/utils";
 import { Article } from "@/models/Article";
+
+function getActivityLabel(action: string) {
+  switch (action) {
+    case "created":
+      return "создал материал";
+    case "updated":
+      return "обновил материал";
+    case "deleted":
+      return "удалил материал";
+    case "password_changed":
+      return "сменил пароль";
+    default:
+      return "выполнил действие";
+  }
+}
 
 export default async function AdminDashboardPage() {
   await connectToDatabase();
@@ -28,6 +44,7 @@ export default async function AdminDashboardPage() {
     ? Math.round(articles.reduce((total, article) => total + (article.seoScore || 0), 0) / articles.length)
     : 0;
   const upcomingScheduled = scheduledArticles.slice(0, 3);
+  const recentActivity = await getRecentActivity(6);
 
   return (
     <div className="space-y-6">
@@ -165,6 +182,37 @@ export default async function AdminDashboardPage() {
                   <p className="font-medium text-slate-950">{article.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">/{article.slug}</p>
                   <p className="mt-3 text-sm text-slate-700">{new Date(article.scheduledAt).toLocaleString("ru-RU")}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/70 bg-white/85">
+          <CardHeader>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              <History className="h-3.5 w-3.5" />
+              Activity log
+            </div>
+            <CardTitle>Последние действия</CardTitle>
+            <CardDescription>Краткая история изменений в админке.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recentActivity.length === 0 ? (
+              <div className="rounded-[1.25rem] border border-dashed bg-secondary/40 p-4 text-sm text-muted-foreground">
+                История пока пуста. Действия появятся после создания, обновления или удаления материалов.
+              </div>
+            ) : (
+              recentActivity.map((item) => (
+                <div key={item.id} className="rounded-[1.25rem] border bg-white p-4">
+                  <p className="text-sm font-medium text-slate-950">
+                    {item.actorName} {getActivityLabel(item.action)}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {item.entityTitle || item.details || item.entityType}
+                  </p>
+                  {item.details ? <p className="mt-2 text-xs text-slate-600">{item.details}</p> : null}
+                  <p className="mt-3 text-xs text-muted-foreground">{formatRelativeDate(item.createdAt)}</p>
                 </div>
               ))
             )}

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
 
 import { auth, signIn } from "@/auth";
+import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { changePasswordSchema, loginSchema } from "@/lib/validations";
 import { User } from "@/models/User";
@@ -91,6 +92,17 @@ export async function changePasswordAction(_: AuthActionState, formData: FormDat
 
   user.passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
   await user.save();
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "account",
+    entityId: String(user._id),
+    entityTitle: session.user.email,
+    action: "password_changed",
+    details: "Password updated from admin account settings.",
+  });
 
   return {
     success: true,

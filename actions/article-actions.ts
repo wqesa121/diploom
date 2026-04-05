@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { estimateSeoScore } from "@/lib/utils";
 import { articleSchema } from "@/lib/validations";
@@ -12,6 +13,11 @@ import { Article } from "@/models/Article";
 export type ArticleActionState = {
   success: boolean;
   error?: string;
+};
+
+type DeletedArticleShape = {
+  title: string;
+  slug: string;
 };
 
 function normalizeArray(formData: FormData, key: string) {
@@ -68,12 +74,23 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     tags: parsed.data.tags,
   });
 
-  await Article.create({
+  const article = await Article.create({
     ...parsed.data,
     content,
     scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
     author: session.user.id,
     seoScore,
+  });
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: String(article._id),
+    entityTitle: parsed.data.title,
+    action: "created",
+    details: parsed.data.status === "published" ? "Article created as published." : "Article created as draft.",
   });
 
   revalidatePath("/admin");
@@ -122,6 +139,19 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
     seoScore,
   });
 
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: id,
+    entityTitle: parsed.data.title,
+    action: "updated",
+    details: parsed.data.scheduledAt
+      ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.`
+      : `Status: ${parsed.data.status}.`,
+  });
+
   revalidatePath("/admin");
   revalidatePath("/admin/articles");
   revalidatePath(`/admin/articles/${id}/edit`);
@@ -143,7 +173,22 @@ export async function deleteArticleAction(id: string) {
   }
 
   await connectToDatabase();
-  await Article.findByIdAndDelete(id);
+  const article = await Article.findById(id).select("title slug").lean<DeletedArticleShape | null>();
+
+  if (article) {
+    await Article.findByIdAndDelete(id);
+    await logActivity({
+      actorId: session.user.id,
+      actorName: session.user.name,
+      actorEmail: session.user.email,
+      entityType: "article",
+      entityId: id,
+      entityTitle: article.title,
+      action: "deleted",
+      details: `Deleted article /${article.slug}.`,
+    });
+  }
+
   revalidatePath("/admin");
   revalidatePath("/admin/articles");
   revalidatePath("/");
