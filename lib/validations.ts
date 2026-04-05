@@ -33,6 +33,11 @@ export const articleSchema = z.object({
   additionalImages: z.array(z.string().url()).max(6),
   imageQuery: z.string().max(120).optional().default(""),
   status: z.enum(["draft", "published"]),
+  scheduledAt: z
+    .string()
+    .optional()
+    .default("")
+    .refine((value) => !value || !Number.isNaN(Date.parse(value)), "Укажите корректную дату отложенной публикации"),
 });
 
 export const aiGenerateSchema = z.object({

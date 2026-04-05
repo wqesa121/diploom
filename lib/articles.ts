@@ -25,6 +25,7 @@ type ArticleShape = {
   imageQuery?: string;
   author?: ArticleAuthorShape;
   status: "draft" | "published";
+  scheduledAt?: Date | string | null;
   seoScore?: number;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -36,6 +37,12 @@ type PublishedArticlesOptions = {
   search?: string;
   tag?: string;
 };
+
+function buildLiveArticleFilters() {
+  return {
+    $or: [{ scheduledAt: null }, { scheduledAt: { $lte: new Date() } }],
+  };
+}
 
 export async function getArticleById(id: string) {
   await connectToDatabase();
@@ -56,7 +63,9 @@ export async function getAllArticles() {
 
 export async function getPublishedArticleBySlug(slug: string) {
   await connectToDatabase();
-  const article = await Article.findOne({ slug, status: "published" }).populate("author", "name email").lean();
+  const article = await Article.findOne({ slug, status: "published", ...buildLiveArticleFilters() })
+    .populate("author", "name email")
+    .lean();
   return article ? serializeArticle(article as unknown as ArticleShape) : null;
 }
 
@@ -74,21 +83,28 @@ export async function getPublishedArticles(options: PublishedArticlesOptions = {
   const search = options.search?.trim();
   const tag = options.tag?.trim();
 
+  const andConditions: Record<string, unknown>[] = [buildLiveArticleFilters()];
   const filters: Record<string, unknown> = {
     status: "published",
   };
 
   if (search) {
-    filters.$or = [
+    andConditions.push({
+      $or: [
       { title: { $regex: search, $options: "i" } },
       { excerpt: { $regex: search, $options: "i" } },
       { metaTitle: { $regex: search, $options: "i" } },
       { tags: { $regex: search, $options: "i" } },
-    ];
+      ],
+    });
   }
 
   if (tag) {
-    filters.tags = tag;
+    andConditions.push({ tags: tag });
+  }
+
+  if (andConditions.length > 0) {
+    filters.$and = andConditions;
   }
 
   const [total, articles] = await Promise.all([
@@ -118,7 +134,7 @@ export async function getRelatedPublishedArticles(article: SerializedArticle, li
   const related = await Article.find({
     status: "published",
     slug: { $ne: article.slug },
-    $or: [{ tags: { $in: article.tags } }, { imageQuery: article.imageQuery }],
+    $and: [buildLiveArticleFilters(), { $or: [{ tags: { $in: article.tags } }, { imageQuery: article.imageQuery }] }],
   })
     .populate("author", "name email")
     .sort({ updatedAt: -1 })
@@ -148,6 +164,7 @@ export function serializeArticle(article: ArticleShape): SerializedArticle {
       email: article.author?.email ?? "",
     },
     status: article.status,
+    scheduledAt: article.scheduledAt ? new Date(article.scheduledAt).toISOString() : null,
     seoScore: article.seoScore ?? 0,
     createdAt: new Date(article.createdAt).toISOString(),
     updatedAt: new Date(article.updatedAt).toISOString(),

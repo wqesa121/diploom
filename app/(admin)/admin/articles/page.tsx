@@ -9,7 +9,7 @@ import { getAllArticles } from "@/lib/articles";
 type ArticlesPageProps = {
   searchParams: Promise<{
     search?: string;
-    status?: "draft" | "published" | "all";
+    status?: "draft" | "published" | "scheduled" | "all";
     tag?: string;
   }>;
 };
@@ -24,6 +24,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   const search = normalize(params.search);
   const status = params.status && params.status !== "all" ? params.status : "all";
   const tag = params.tag?.trim() ?? "";
+  const now = Date.now();
 
   const availableTags = Array.from(new Set(allArticles.flatMap((article) => article.tags))).sort((a, b) => a.localeCompare(b, "ru"));
 
@@ -35,7 +36,13 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
       article.metaTitle.toLowerCase().includes(search) ||
       article.tags.some((item) => item.toLowerCase().includes(search));
 
-    const matchesStatus = status === "all" ? true : article.status === status;
+    const isScheduled = article.status === "published" && !!article.scheduledAt && new Date(article.scheduledAt).getTime() > now;
+    const matchesStatus =
+      status === "all"
+        ? true
+        : status === "scheduled"
+          ? isScheduled
+          : article.status === status;
     const matchesTag = !tag ? true : article.tags.includes(tag);
 
     return matchesSearch && matchesStatus && matchesTag;
@@ -76,6 +83,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
                 <option value="all">Все</option>
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
+                <option value="scheduled">Scheduled</option>
               </select>
             </label>
 

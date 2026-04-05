@@ -36,6 +36,7 @@ function parseArticle(formData: FormData) {
     additionalImages: normalizeArray(formData, "additionalImages"),
     imageQuery: formData.get("imageQuery") || "",
     status: formData.get("status"),
+    scheduledAt: formData.get("scheduledAt") || "",
   });
 }
 
@@ -70,6 +71,7 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
   await Article.create({
     ...parsed.data,
     content,
+    scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
     author: session.user.id,
     seoScore,
   });
@@ -115,6 +117,7 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
   await Article.findByIdAndUpdate(id, {
     ...parsed.data,
     content,
+    scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
     author: session.user.id,
     seoScore,
   });

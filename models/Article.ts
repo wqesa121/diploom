@@ -64,6 +64,11 @@ const articleSchema = new Schema(
       default: "draft",
       index: true,
     },
+    scheduledAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     seoScore: {
       type: Number,
       default: 0,

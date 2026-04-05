@@ -44,6 +44,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
   const [additionalImagesInput, setAdditionalImagesInput] = useState(initialData?.additionalImages.join(", ") ?? "");
   const [imageQuery, setImageQuery] = useState(initialData?.imageQuery ?? "");
   const [status, setStatus] = useState<"draft" | "published">(initialData?.status ?? "draft");
+  const [scheduledAt, setScheduledAt] = useState(initialData?.scheduledAt ? new Date(initialData.scheduledAt).toISOString().slice(0, 16) : "");
   const [topic, setTopic] = useState(initialData?.title ?? "");
   const [keywords, setKeywords] = useState(initialData?.tags.join(", ") ?? "");
   const [desiredLength, setDesiredLength] = useState<"short" | "medium" | "long">("medium");
@@ -111,6 +112,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
         <input type="hidden" name="additionalImages" value={additionalImagesInput} />
         <input type="hidden" name="featuredImage" value={featuredImage} />
         <input type="hidden" name="imageQuery" value={imageQuery} />
+        <input type="hidden" name="scheduledAt" value={scheduledAt} />
 
         <Card>
           <CardHeader>
@@ -153,6 +155,18 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
                     <SelectItem value="published">Published</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="scheduledAt">Scheduled publish time</Label>
+                <Input
+                  id="scheduledAt"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(event) => setScheduledAt(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Если указан будущий момент времени и статус = Published, статья появится на публичных страницах только после этой даты.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="metaTitle">Meta Title</Label>

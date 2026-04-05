@@ -12,20 +12,27 @@ export async function GET(request: Request) {
   const query = searchParams.get("search")?.trim();
   const tag = searchParams.get("tag")?.trim();
 
+  const andConditions: Record<string, unknown>[] = [{ $or: [{ scheduledAt: null }, { scheduledAt: { $lte: new Date() } }] }];
   const filters: Record<string, unknown> = {
     status: "published",
   };
 
   if (query) {
-    filters.$or = [
+    andConditions.push({
+      $or: [
       { title: { $regex: query, $options: "i" } },
       { excerpt: { $regex: query, $options: "i" } },
       { tags: { $regex: query, $options: "i" } },
-    ];
+      ],
+    });
   }
 
   if (tag) {
-    filters.tags = tag;
+    andConditions.push({ tags: tag });
+  }
+
+  if (andConditions.length > 0) {
+    filters.$and = andConditions;
   }
 
   await connectToDatabase();

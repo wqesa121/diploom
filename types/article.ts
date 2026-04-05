@@ -19,6 +19,7 @@ export type SerializedArticle = {
     email: string;
   };
   status: ArticleStatus;
+  scheduledAt: string | null;
   seoScore: number;
   createdAt: string;
   updatedAt: string;

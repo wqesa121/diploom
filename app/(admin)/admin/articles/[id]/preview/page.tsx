@@ -113,6 +113,7 @@ export default async function ArticlePreviewPage({ params }: ArticlePreviewPageP
               <p>SEO score: {article.seoScore}/100</p>
               <p>Updated: {formatRelativeDate(article.updatedAt)}</p>
               <p>Author: {article.author.name}</p>
+              <p>Scheduled: {article.scheduledAt ? new Date(article.scheduledAt).toLocaleString("ru-RU") : "not set"}</p>
               <p>External preview: {externalPreviewHref ? "enabled" : "disabled (set PREVIEW_TOKEN)"}</p>
             </CardContent>
           </Card>

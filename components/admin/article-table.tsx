@@ -17,6 +17,8 @@ export function ArticleTable({ articles }: ArticleTableProps) {
     return <div className="rounded-[1.5rem] border border-dashed bg-white/70 p-10 text-center text-muted-foreground">Пока нет статей. Создайте первую через Generate with AI.</div>;
   }
 
+  const now = Date.now();
+
   return (
     <Table>
       <TableHeader>
@@ -39,7 +41,12 @@ export function ArticleTable({ articles }: ArticleTableProps) {
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant={article.status === "published" ? "default" : "secondary"}>{article.status}</Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={article.status === "published" ? "default" : "secondary"}>{article.status}</Badge>
+                {article.status === "published" && article.scheduledAt && new Date(article.scheduledAt).getTime() > now ? (
+                  <Badge variant="outline">scheduled</Badge>
+                ) : null}
+              </div>
             </TableCell>
             <TableCell>
               <div className="flex max-w-[300px] flex-wrap gap-2">
@@ -51,7 +58,12 @@ export function ArticleTable({ articles }: ArticleTableProps) {
               </div>
             </TableCell>
             <TableCell>{article.seoScore}/100</TableCell>
-            <TableCell>{formatRelativeDate(article.updatedAt)}</TableCell>
+            <TableCell>
+              <div className="space-y-1 text-sm">
+                <p>{formatRelativeDate(article.updatedAt)}</p>
+                {article.scheduledAt ? <p className="text-xs text-muted-foreground">Publish: {new Date(article.scheduledAt).toLocaleString("ru-RU")}</p> : null}
+              </div>
+            </TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
                 <Button asChild variant="secondary" size="sm">
