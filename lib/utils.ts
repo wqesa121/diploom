@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 
@@ -52,4 +52,20 @@ export function formatRelativeDate(date: Date | string) {
     addSuffix: true,
     locale: ru,
   });
+}
+
+export function formatCalendarDate(date: Date | string) {
+  return format(new Date(date), "d MMMM yyyy", {
+    locale: ru,
+  });
+}
+
+export function estimateReadingTime(content: string, wordsPerMinute = 220) {
+  const wordCount = content
+    .replace(/[#*_>`\-]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
 }
