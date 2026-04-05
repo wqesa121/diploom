@@ -37,3 +37,7 @@ export function getAiEnv() {
     UNSPLASH_ACCESS_KEY: process.env.UNSPLASH_ACCESS_KEY,
   });
 }
+
+export function getPreviewToken() {
+  return process.env.PREVIEW_TOKEN?.trim() || null;
+}

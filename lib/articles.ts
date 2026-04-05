@@ -60,6 +60,12 @@ export async function getPublishedArticleBySlug(slug: string) {
   return article ? serializeArticle(article as unknown as ArticleShape) : null;
 }
 
+export async function getArticleBySlug(slug: string) {
+  await connectToDatabase();
+  const article = await Article.findOne({ slug }).populate("author", "name email").lean();
+  return article ? serializeArticle(article as unknown as ArticleShape) : null;
+}
+
 export async function getPublishedArticles(options: PublishedArticlesOptions = {}) {
   await connectToDatabase();
 

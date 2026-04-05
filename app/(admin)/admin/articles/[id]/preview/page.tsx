@@ -6,6 +6,7 @@ import { ArrowLeft, FilePenLine } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPreviewToken } from "@/lib/env";
 import { getArticleById } from "@/lib/articles";
 import { markdownToHtml } from "@/lib/markdown";
 import { formatRelativeDate } from "@/lib/utils";
@@ -17,12 +18,14 @@ type ArticlePreviewPageProps = {
 export default async function ArticlePreviewPage({ params }: ArticlePreviewPageProps) {
   const { id } = await params;
   const article = await getArticleById(id);
+  const previewToken = getPreviewToken();
 
   if (!article) {
     notFound();
   }
 
   const contentHtml = markdownToHtml(article.markdown);
+  const externalPreviewHref = previewToken ? `/preview/${article.slug}?token=${encodeURIComponent(previewToken)}` : null;
 
   return (
     <div className="space-y-6">
@@ -39,6 +42,13 @@ export default async function ArticlePreviewPage({ params }: ArticlePreviewPageP
             Редактировать
           </Link>
         </Button>
+        {externalPreviewHref ? (
+          <Button asChild variant="secondary">
+            <Link href={externalPreviewHref} target="_blank" rel="noreferrer">
+              External preview
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <article className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -103,6 +113,7 @@ export default async function ArticlePreviewPage({ params }: ArticlePreviewPageP
               <p>SEO score: {article.seoScore}/100</p>
               <p>Updated: {formatRelativeDate(article.updatedAt)}</p>
               <p>Author: {article.author.name}</p>
+              <p>External preview: {externalPreviewHref ? "enabled" : "disabled (set PREVIEW_TOKEN)"}</p>
             </CardContent>
           </Card>
         </aside>
