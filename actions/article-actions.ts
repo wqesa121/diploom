@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
+import { createArticleRevision } from "@/lib/revisions";
 import { estimateSeoScore } from "@/lib/utils";
 import { articleSchema } from "@/lib/validations";
 import { Article } from "@/models/Article";
@@ -19,6 +20,25 @@ type DeletedArticleShape = {
   title: string;
   slug: string;
   featured?: boolean;
+};
+
+type RevisionArticleShape = {
+  _id: unknown;
+  title: string;
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  excerpt: string;
+  content: Record<string, unknown>;
+  markdown: string;
+  tags?: string[];
+  featuredImage?: string;
+  additionalImages?: string[];
+  imageQuery?: string;
+  status: "draft" | "published";
+  featured?: boolean;
+  scheduledAt?: Date | string | null;
+  seoScore?: number;
 };
 
 type BulkActionType = "publish" | "draft" | "delete";
@@ -109,6 +129,13 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     details: `${parsed.data.status === "published" ? "Article created as published." : "Article created as draft."}${parsed.data.featured ? " Marked as featured." : ""}`,
   });
 
+  await createArticleRevision({
+    article: article.toObject(),
+    editorId: session.user.id,
+    editorName: session.user.name,
+    editorEmail: session.user.email,
+  });
+
   revalidateArticleSurfaces();
   redirect("/admin/articles");
 
@@ -167,6 +194,17 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
       ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.${parsed.data.featured ? " Featured enabled." : ""}`
       : `Status: ${parsed.data.status}.${parsed.data.featured ? " Featured enabled." : ""}`,
   });
+
+  const updatedArticle = await Article.findById(id).lean<RevisionArticleShape | null>();
+
+  if (updatedArticle) {
+    await createArticleRevision({
+      article: updatedArticle,
+      editorId: session.user.id,
+      editorName: session.user.name,
+      editorEmail: session.user.email,
+    });
+  }
 
   revalidateArticleSurfaces();
   revalidatePath(`/admin/articles/${id}/edit`);
