@@ -5,6 +5,21 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Минимум 6 символов"),
 });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(6, "Введите текущий пароль"),
+    newPassword: z.string().min(8, "Новый пароль должен содержать минимум 8 символов"),
+    confirmPassword: z.string().min(8, "Подтвердите новый пароль"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Подтверждение пароля не совпадает",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: "Новый пароль должен отличаться от текущего",
+    path: ["newPassword"],
+  });
+
 export const articleSchema = z.object({
   title: z.string().min(5).max(120),
   slug: z.string().min(3).max(140),
@@ -30,4 +45,5 @@ export const aiGenerateSchema = z.object({
 
 export type ArticleInput = z.infer<typeof articleSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type AiGenerateInput = z.infer<typeof aiGenerateSchema>;
