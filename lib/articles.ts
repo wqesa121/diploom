@@ -30,6 +30,13 @@ type ArticleShape = {
   updatedAt: Date | string;
 };
 
+type PublishedArticlesOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  tag?: string;
+};
+
 export async function getArticleById(id: string) {
   await connectToDatabase();
 
@@ -51,6 +58,68 @@ export async function getPublishedArticleBySlug(slug: string) {
   await connectToDatabase();
   const article = await Article.findOne({ slug, status: "published" }).populate("author", "name email").lean();
   return article ? serializeArticle(article as unknown as ArticleShape) : null;
+}
+
+export async function getPublishedArticles(options: PublishedArticlesOptions = {}) {
+  await connectToDatabase();
+
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.max(1, options.limit ?? 9);
+  const search = options.search?.trim();
+  const tag = options.tag?.trim();
+
+  const filters: Record<string, unknown> = {
+    status: "published",
+  };
+
+  if (search) {
+    filters.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { excerpt: { $regex: search, $options: "i" } },
+      { metaTitle: { $regex: search, $options: "i" } },
+      { tags: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  if (tag) {
+    filters.tags = tag;
+  }
+
+  const [total, articles] = await Promise.all([
+    Article.countDocuments(filters),
+    Article.find(filters)
+      .populate("author", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+  ]);
+
+  return {
+    data: articles.map((article) => serializeArticle(article as unknown as ArticleShape)),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  };
+}
+
+export async function getRelatedPublishedArticles(article: SerializedArticle, limit = 3) {
+  await connectToDatabase();
+
+  const related = await Article.find({
+    status: "published",
+    slug: { $ne: article.slug },
+    $or: [{ tags: { $in: article.tags } }, { imageQuery: article.imageQuery }],
+  })
+    .populate("author", "name email")
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  return related.map((item) => serializeArticle(item as unknown as ArticleShape));
 }
 
 export function serializeArticle(article: ArticleShape): SerializedArticle {
