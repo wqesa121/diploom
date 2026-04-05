@@ -12,11 +12,22 @@ import { Article } from "@/models/Article";
 export default async function AdminDashboardPage() {
   await connectToDatabase();
   const session = await auth();
+  const now = Date.now();
 
   const articles = await Article.find().sort({ updatedAt: -1 }).lean();
-  const publishedArticles = articles.filter((article) => article.status === "published");
+  const liveArticles = articles.filter(
+    (article) => article.status === "published" && (!article.scheduledAt || new Date(article.scheduledAt).getTime() <= now),
+  );
+  const scheduledArticles = articles
+    .filter((article) => article.status === "published" && article.scheduledAt && new Date(article.scheduledAt).getTime() > now)
+    .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime());
+  const draftArticles = articles.filter((article) => article.status === "draft");
   const uniqueTags = new Set(articles.flatMap((article) => article.tags));
   const recentArticles = articles.slice(0, 5);
+  const averageSeoScore = articles.length
+    ? Math.round(articles.reduce((total, article) => total + (article.seoScore || 0), 0) / articles.length)
+    : 0;
+  const upcomingScheduled = scheduledArticles.slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -44,23 +55,26 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card className="border-white/70 bg-gradient-to-br from-slate-950 to-slate-800 text-white">
           <CardHeader>
-            <CardTitle className="text-2xl">Headless API ready</CardTitle>
+            <CardTitle className="text-2xl">Publishing pulse</CardTitle>
             <CardDescription className="text-slate-300">
-              `/api/posts` уже отдает только опубликованные материалы с пагинацией, поиском и фильтром по тегам.
+              Dashboard теперь показывает состояние live и scheduled публикаций, а не только общий объём контента.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-slate-300">
-            <p>AI output автоматически рассчитывает slug, excerpt и SEO score.</p>
-            <p>MongoDB Atlas и Mongoose используются как единый source of truth для админки и API.</p>
+            <p>Live now: {liveArticles.length}</p>
+            <p>Scheduled queue: {scheduledArticles.length}</p>
+            <p>Average SEO score: {averageSeoScore}/100</p>
           </CardContent>
         </Card>
       </section>
 
       <DashboardMetrics
         totalArticles={articles.length}
-        publishedArticles={publishedArticles.length}
-        draftArticles={articles.length - publishedArticles.length}
+        liveArticles={liveArticles.length}
+        scheduledArticles={scheduledArticles.length}
+        draftArticles={draftArticles.length}
         totalTags={uniqueTags.size}
+        averageSeoScore={averageSeoScore}
       />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
@@ -83,6 +97,9 @@ export default async function AdminDashboardPage() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${article.status === "published" ? "bg-primary/10 text-primary" : "bg-secondary text-secondary-foreground"}`}>
                         {article.status}
                       </span>
+                      {article.status === "published" && article.scheduledAt && new Date(article.scheduledAt).getTime() > now ? (
+                        <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">scheduled</span>
+                      ) : null}
                     </div>
                     <p className="text-sm text-muted-foreground">/{article.slug}</p>
                   </div>
@@ -104,6 +121,7 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
 
+        <div className="space-y-6">
         <Card className="border-primary/10 bg-primary/5">
           <CardHeader>
             <CardTitle>Setup checklist</CardTitle>
@@ -130,6 +148,29 @@ export default async function AdminDashboardPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card className="border-white/70 bg-white/85">
+          <CardHeader>
+            <CardTitle>Upcoming releases</CardTitle>
+            <CardDescription>Ближайшие материалы, которые уже запланированы к публикации.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {upcomingScheduled.length === 0 ? (
+              <div className="rounded-[1.25rem] border border-dashed bg-secondary/40 p-4 text-sm text-muted-foreground">
+                Сейчас нет материалов в scheduled queue.
+              </div>
+            ) : (
+              upcomingScheduled.map((article) => (
+                <div key={String(article._id)} className="rounded-[1.25rem] border bg-white p-4">
+                  <p className="font-medium text-slate-950">{article.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">/{article.slug}</p>
+                  <p className="mt-3 text-sm text-slate-700">{new Date(article.scheduledAt).toLocaleString("ru-RU")}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+        </div>
       </section>
     </div>
   );

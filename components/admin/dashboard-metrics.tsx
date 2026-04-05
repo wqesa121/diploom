@@ -1,12 +1,14 @@
-import { FileText, Globe2, Sparkles, Tags } from "lucide-react";
+import { CalendarClock, FileText, Gauge, Globe2, Sparkles, Tags } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DashboardMetricsProps = {
   totalArticles: number;
-  publishedArticles: number;
+  liveArticles: number;
+  scheduledArticles: number;
   draftArticles: number;
   totalTags: number;
+  averageSeoScore: number;
 };
 
 const items = [
@@ -17,10 +19,16 @@ const items = [
     accent: "from-teal-500/20 to-emerald-400/10",
   },
   {
-    key: "publishedArticles",
-    label: "Опубликовано",
+    key: "liveArticles",
+    label: "Live сейчас",
     icon: Globe2,
     accent: "from-sky-500/20 to-cyan-400/10",
+  },
+  {
+    key: "scheduledArticles",
+    label: "Scheduled",
+    icon: CalendarClock,
+    accent: "from-violet-500/20 to-fuchsia-300/10",
   },
   {
     key: "draftArticles",
@@ -34,11 +42,17 @@ const items = [
     icon: Tags,
     accent: "from-rose-500/20 to-orange-300/10",
   },
+  {
+    key: "averageSeoScore",
+    label: "Средний SEO score",
+    icon: Gauge,
+    accent: "from-lime-500/20 to-emerald-300/10",
+  },
 ] as const;
 
 export function DashboardMetrics(props: DashboardMetricsProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {items.map((item) => {
         const Icon = item.icon;
         const value = props[item.key];
