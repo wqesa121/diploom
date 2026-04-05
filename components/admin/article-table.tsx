@@ -12,22 +12,38 @@ import {
 } from "@/actions/article-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { canRunBulkAction, hasPermission, type UserRole } from "@/lib/permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatRelativeDate } from "@/lib/utils";
 import type { SerializedArticle } from "@/types/article";
 
 type ArticleTableProps = {
   articles: SerializedArticle[];
+  role: UserRole;
 };
 
-export function ArticleTable({ articles }: ArticleTableProps) {
+export function ArticleTable({ articles, role }: ArticleTableProps) {
   const now = Date.now();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<"publish" | "review" | "draft" | "delete">("publish");
+  const [bulkAction, setBulkAction] = useState<"publish" | "review" | "draft" | "delete">(
+    hasPermission(role, "articles:publish") ? "publish" : "review",
+  );
   const allSelected = useMemo(() => articles.length > 0 && selectedIds.length === articles.length, [articles.length, selectedIds.length]);
+  const canCreate = hasPermission(role, "articles:create");
+  const canEdit = hasPermission(role, "articles:edit");
+  const canDelete = hasPermission(role, "articles:delete");
+  const canPublish = hasPermission(role, "articles:publish");
+  const canFeature = hasPermission(role, "articles:feature");
+  const availableBulkActions = ["publish", "review", "draft", "delete"].filter((action) =>
+    canRunBulkAction(role, action as "publish" | "review" | "draft" | "delete"),
+  ) as Array<"publish" | "review" | "draft" | "delete">;
 
   if (!articles.length) {
-    return <div className="rounded-[1.5rem] border border-dashed bg-white/70 p-10 text-center text-muted-foreground">Пока нет статей. Создайте первую через Generate with AI.</div>;
+    return (
+      <div className="rounded-[1.5rem] border border-dashed bg-white/70 p-10 text-center text-muted-foreground">
+        {canCreate ? "Пока нет статей. Создайте первую через Generate with AI." : "Материалов пока нет."}
+      </div>
+    );
   }
 
   function toggleArticleSelection(articleId: string) {
@@ -57,10 +73,10 @@ export function ArticleTable({ articles }: ArticleTableProps) {
             onChange={(event) => setBulkAction(event.target.value as "publish" | "review" | "draft" | "delete")}
             className="flex h-11 min-w-[220px] rounded-2xl border bg-white px-4 py-2 text-sm shadow-sm outline-none transition-colors focus:border-primary"
           >
-            <option value="publish">Publish selected</option>
-            <option value="review">Move selected to in review</option>
-            <option value="draft">Move selected to draft</option>
-            <option value="delete">Delete selected</option>
+            {availableBulkActions.includes("publish") ? <option value="publish">Publish selected</option> : null}
+            {availableBulkActions.includes("review") ? <option value="review">Move selected to in review</option> : null}
+            {availableBulkActions.includes("draft") ? <option value="draft">Move selected to draft</option> : null}
+            {availableBulkActions.includes("delete") ? <option value="delete">Delete selected</option> : null}
           </select>
           <Button type="submit" disabled={selectedIds.length === 0} variant={bulkAction === "delete" ? "destructive" : "default"}>
             Apply
@@ -134,7 +150,7 @@ export function ArticleTable({ articles }: ArticleTableProps) {
                       </Button>
                     </form>
                   ) : null}
-                  {article.status === "in_review" ? (
+                  {article.status === "in_review" && canPublish ? (
                     <>
                       <form action={updateArticleWorkflowAction.bind(null, article.id, "published")}>
                         <Button variant="ghost" size="sm">
@@ -142,6 +158,10 @@ export function ArticleTable({ articles }: ArticleTableProps) {
                           Publish
                         </Button>
                       </form>
+                    </>
+                  ) : null}
+                  {article.status === "in_review" ? (
+                    <>
                       <form action={updateArticleWorkflowAction.bind(null, article.id, "draft")}>
                         <Button variant="ghost" size="sm">
                           <Undo2 className="h-4 w-4" />
@@ -150,7 +170,7 @@ export function ArticleTable({ articles }: ArticleTableProps) {
                       </form>
                     </>
                   ) : null}
-                  {article.status === "published" ? (
+                  {article.status === "published" && canFeature ? (
                     <>
                       <form action={toggleFeaturedArticleAction.bind(null, article.id)}>
                         <Button variant={article.featured ? "secondary" : "ghost"} size="sm">
@@ -158,6 +178,10 @@ export function ArticleTable({ articles }: ArticleTableProps) {
                           {article.featured ? "Unfeature" : "Feature"}
                         </Button>
                       </form>
+                    </>
+                  ) : null}
+                  {article.status === "published" ? (
+                    <>
                       <form action={updateArticleWorkflowAction.bind(null, article.id, "in_review")}>
                         <Button variant="ghost" size="sm">
                           <ShieldCheck className="h-4 w-4" />
@@ -172,18 +196,22 @@ export function ArticleTable({ articles }: ArticleTableProps) {
                       Preview
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/admin/articles/${article.id}/edit`}>
-                      <Pencil className="h-4 w-4" />
-                      Edit
-                    </Link>
-                  </Button>
-                  <form action={deleteArticleAction.bind(null, article.id)}>
-                    <Button variant="destructive" size="sm">
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                  {canEdit ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/admin/articles/${article.id}/edit`}>
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </Link>
                     </Button>
-                  </form>
+                  ) : null}
+                  {canDelete ? (
+                    <form action={deleteArticleAction.bind(null, article.id)}>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </form>
+                  ) : null}
                 </div>
               </TableCell>
             </TableRow>

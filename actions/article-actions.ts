@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
+import { canRunBulkAction, canTransitionArticleWorkflow, DEFAULT_ROLE, getDefaultAdminPath, hasPermission } from "@/lib/permissions";
 import { createArticleRevision, getArticleRevisionSnapshot } from "@/lib/revisions";
 import { estimateSeoScore } from "@/lib/utils";
 import { articleSchema, reviewNoteSchema } from "@/lib/validations";
@@ -108,6 +109,12 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     return { success: false, error: "Сессия недействительна." };
   }
 
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "articles:create")) {
+    return { success: false, error: "Недостаточно прав для создания статьи." };
+  }
+
   const parsed = parseArticle(formData);
 
   if (!parsed.success) {
@@ -172,6 +179,12 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
 
   if (!session?.user?.id) {
     return { success: false, error: "Сессия недействительна." };
+  }
+
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "articles:edit")) {
+    return { success: false, error: "Недостаточно прав для редактирования статьи." };
   }
 
   const parsed = parseArticle(formData);
@@ -250,6 +263,12 @@ export async function deleteArticleAction(id: string) {
     throw new Error("Unauthorized");
   }
 
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "articles:delete")) {
+    redirect(getDefaultAdminPath(role));
+  }
+
   await connectToDatabase();
   const article = await Article.findById(id).select("title slug").lean<DeletedArticleShape | null>();
 
@@ -277,6 +296,8 @@ export async function bulkArticleAction(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
+  const role = session.user.role ?? DEFAULT_ROLE;
+
   const actionType = String(formData.get("bulkAction") || "") as BulkActionType;
   const articleIds = formData
     .getAll("articleIds")
@@ -285,6 +306,10 @@ export async function bulkArticleAction(formData: FormData) {
 
   if (!articleIds.length || !["publish", "review", "draft", "delete"].includes(actionType)) {
     redirect("/admin/articles");
+  }
+
+  if (!canRunBulkAction(role, actionType)) {
+    redirect(getDefaultAdminPath(role));
   }
 
   await connectToDatabase();
@@ -346,6 +371,12 @@ export async function restoreArticleRevisionAction(articleId: string, revisionId
 
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
+  }
+
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "articles:edit")) {
+    redirect(getDefaultAdminPath(role));
   }
 
   await connectToDatabase();
@@ -427,6 +458,12 @@ export async function updateArticleWorkflowAction(id: string, nextStatus: "draft
     throw new Error("Unauthorized");
   }
 
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!canTransitionArticleWorkflow(role, nextStatus)) {
+    redirect(getDefaultAdminPath(role));
+  }
+
   await connectToDatabase();
 
   const article = await Article.findById(id).lean<WorkflowArticleShape | null>();
@@ -478,6 +515,12 @@ export async function toggleFeaturedArticleAction(id: string) {
 
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
+  }
+
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "articles:feature")) {
+    redirect(getDefaultAdminPath(role));
   }
 
   await connectToDatabase();
@@ -534,6 +577,12 @@ export async function addArticleReviewNoteAction(articleId: string, formData: Fo
 
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
+  }
+
+  const role = session.user.role ?? DEFAULT_ROLE;
+
+  if (!hasPermission(role, "review:comment")) {
+    redirect(getDefaultAdminPath(role));
   }
 
   const parsed = reviewNoteSchema.safeParse({

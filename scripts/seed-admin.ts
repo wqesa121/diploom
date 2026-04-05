@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 
 import { connectToDatabase } from "@/lib/db";
+import type { UserRole } from "@/lib/permissions";
 import { User } from "@/models/User";
 
 async function main() {
@@ -19,9 +20,14 @@ async function main() {
   const email = args.get("email") ?? "";
   const password = args.get("password") ?? "";
   const name = args.get("name") ?? "Admin";
+  const role = (args.get("role") ?? "admin") as UserRole;
 
   if (!email || !password) {
-    throw new Error("Usage: npm run seed:admin -- --email admin@example.com --password StrongPass123! --name Admin");
+    throw new Error("Usage: npm run seed:admin -- --email admin@example.com --password StrongPass123! --name Admin --role admin");
+  }
+
+  if (!["admin", "editor", "reviewer"].includes(role)) {
+    throw new Error("Role must be one of: admin, editor, reviewer.");
   }
 
   await connectToDatabase();
@@ -37,10 +43,10 @@ async function main() {
     name,
     email: email.toLowerCase(),
     passwordHash,
-    role: "admin",
+    role,
   });
 
-  console.log(`Created admin ${email}`);
+  console.log(`Created ${role} ${email}`);
 }
 
 main()

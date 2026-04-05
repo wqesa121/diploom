@@ -3,9 +3,11 @@ import { ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { AccountPasswordForm } from "@/components/admin/account-password-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DEFAULT_ROLE, getRoleLabel } from "@/lib/permissions";
 
 export default async function AdminAccountPage() {
   const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
 
   return (
     <div className="space-y-6">
@@ -31,7 +33,7 @@ export default async function AdminAccountPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>Email: {session?.user?.email ?? "Unknown"}</p>
-            <p>Role: {session?.user?.role ?? "editor"}</p>
+            <p>Role: {getRoleLabel(role)}</p>
             <p>Рекомендуется использовать уникальный пароль длиной от 12 символов.</p>
           </CardContent>
         </Card>

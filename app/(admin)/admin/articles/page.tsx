@@ -1,10 +1,12 @@
 import Link from "next/link";
 
+import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArticleTable } from "@/components/admin/article-table";
 import { getAllArticles } from "@/lib/articles";
+import { DEFAULT_ROLE, hasPermission } from "@/lib/permissions";
 
 type ArticlesPageProps = {
   searchParams: Promise<{
@@ -22,6 +24,8 @@ function normalize(value?: string) {
 
 export default async function ArticlesPage({ searchParams }: ArticlesPageProps) {
   const params = await searchParams;
+  const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
   const allArticles = await getAllArticles();
   const search = normalize(params.search);
   const status = params.status && params.status !== "all" ? params.status : "all";
@@ -87,9 +91,11 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
             <CardTitle>Content library</CardTitle>
             <CardDescription>Управляйте draft, in review, scheduled и published материалами из одного списка.</CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/admin/articles/new">Новая статья</Link>
-          </Button>
+          {hasPermission(role, "articles:create") ? (
+            <Button asChild>
+              <Link href="/admin/articles/new">Новая статья</Link>
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-6">
           <form className="grid gap-3 rounded-[1.5rem] border bg-secondary/30 p-4 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_220px_220px_auto] lg:items-end">
@@ -184,7 +190,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
             {sort !== "updated-desc" ? <Badge variant="outline">Sort: {sort}</Badge> : null}
           </div>
 
-          <ArticleTable articles={sortedArticles} />
+          <ArticleTable articles={sortedArticles} role={role} />
         </CardContent>
       </Card>
     </div>

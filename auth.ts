@@ -7,6 +7,7 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/mongodb-client";
 import { connectToDatabase } from "@/lib/db";
 import { getAuthEnv } from "@/lib/env";
+import { DEFAULT_ROLE, type UserRole } from "@/lib/permissions";
 import { loginSchema } from "@/lib/validations";
 import { User } from "@/models/User";
 
@@ -17,7 +18,7 @@ type AuthUserRecord = {
   name: string;
   email: string;
   passwordHash: string;
-  role: "admin" | "editor";
+  role: UserRole;
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -74,7 +75,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     jwt({ token, user }) {
       if (user && "role" in user) {
-        token.role = user.role as "admin" | "editor";
+        token.role = user.role as UserRole;
       }
 
       return token;
@@ -82,7 +83,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.role = (token.role as "admin" | "editor" | undefined) ?? "editor";
+        session.user.role = (token.role as UserRole | undefined) ?? DEFAULT_ROLE;
       }
 
       return session;

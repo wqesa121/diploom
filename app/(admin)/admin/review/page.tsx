@@ -1,12 +1,16 @@
 import Link from "next/link";
 
+import { auth } from "@/auth";
 import { ReviewQueue } from "@/components/admin/review-queue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAllArticles } from "@/lib/articles";
+import { DEFAULT_ROLE, hasPermission } from "@/lib/permissions";
 
 export default async function ReviewPage() {
+  const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
   const allArticles = await getAllArticles();
   const reviewArticles = allArticles.filter((article) => article.status === "in_review");
   const scheduledReview = reviewArticles.filter(
@@ -26,12 +30,16 @@ export default async function ReviewPage() {
             <CardDescription>Отдельный поток для редактора: все материалы в статусе `in review`, приоритеты и быстрый выпуск без перехода в общую library.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href="/admin/articles?status=in_review">Open filtered library</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/admin/articles/new">Create article</Link>
-            </Button>
+            {hasPermission(role, "articles:view") ? (
+              <Button asChild variant="outline">
+                <Link href="/admin/articles?status=in_review">Open filtered library</Link>
+              </Button>
+            ) : null}
+            {hasPermission(role, "articles:create") ? (
+              <Button asChild>
+                <Link href="/admin/articles/new">Create article</Link>
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -60,7 +68,7 @@ export default async function ReviewPage() {
             </div>
           </div>
 
-          <ReviewQueue articles={reviewArticles} />
+          <ReviewQueue articles={reviewArticles} role={role} />
         </CardContent>
       </Card>
     </div>

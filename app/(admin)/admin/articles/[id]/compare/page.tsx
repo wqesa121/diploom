@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getArticleById } from "@/lib/articles";
+import { DEFAULT_ROLE, getDefaultAdminPath, hasPermission } from "@/lib/permissions";
 import { getArticleRevisionSnapshot, getArticleRevisions } from "@/lib/revisions";
 import type { ArticleStatus, SerializedArticle } from "@/types/article";
 
@@ -145,6 +147,8 @@ function SnapshotCard({ title, snapshot }: { title: string; snapshot: CompareSna
 export default async function CompareRevisionPage({ params, searchParams }: ComparePageProps) {
   const { id } = await params;
   const query = await searchParams;
+  const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
   const [article, revisions] = await Promise.all([getArticleById(id), getArticleRevisions(id, 12)]);
 
   if (!article) {
@@ -225,9 +229,15 @@ export default async function CompareRevisionPage({ params, searchParams }: Comp
             <CardDescription>Сравнение snapshot к snapshot по ключевым полям, SEO, schedule, тегам и markdown перед restore или publish.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href={`/admin/articles/${article.id}/edit`}>Back to editor</Link>
-            </Button>
+            {hasPermission(role, "articles:edit") ? (
+              <Button asChild variant="outline">
+                <Link href={`/admin/articles/${article.id}/edit`}>Back to editor</Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href={getDefaultAdminPath(role)}>Back</Link>
+              </Button>
+            )}
             <Button asChild>
               <Link href={`/admin/articles/${article.id}/preview`}>Open preview</Link>
             </Button>

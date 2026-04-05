@@ -4,18 +4,24 @@ import Link from "next/link";
 import { BarChart3, FileText, Home, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { hasPermission, type AdminPermission, type UserRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { href: "/admin", label: "Dashboard", icon: Home },
-  { href: "/admin/articles", label: "Articles", icon: FileText },
-  { href: "/admin/review", label: "Review Queue", icon: ShieldCheck },
-  { href: "/admin/articles/new", label: "Generate + Create", icon: Sparkles },
-  { href: "/admin/account", label: "Account Security", icon: KeyRound },
-];
+  { href: "/admin", label: "Dashboard", icon: Home, permission: "dashboard:view" },
+  { href: "/admin/articles", label: "Articles", icon: FileText, permission: "articles:view" },
+  { href: "/admin/review", label: "Review Queue", icon: ShieldCheck, permission: "review:view" },
+  { href: "/admin/articles/new", label: "Generate + Create", icon: Sparkles, permission: "articles:create" },
+  { href: "/admin/account", label: "Account Security", icon: KeyRound, permission: "account:view" },
+] satisfies Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }>; permission: AdminPermission }>;
 
-export function AdminSidebar() {
+type AdminSidebarProps = {
+  role: UserRole;
+};
+
+export function AdminSidebar({ role }: AdminSidebarProps) {
   const pathname = usePathname();
+  const filteredNavigation = navigation.filter((item) => hasPermission(role, item.permission));
 
   return (
     <aside className="flex h-full flex-col justify-between rounded-[2rem] border border-sidebar-border bg-sidebar/90 p-5 shadow-sm backdrop-blur">
@@ -35,7 +41,7 @@ export function AdminSidebar() {
           </p>
         </div>
         <nav className="space-y-2">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, FilePenLine } from "lucide-react";
 
+import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { ExternalPreviewActions } from "@/components/admin/external-preview-acti
 import { getPreviewToken } from "@/lib/env";
 import { getArticleById } from "@/lib/articles";
 import { markdownToHtml } from "@/lib/markdown";
+import { DEFAULT_ROLE, getDefaultAdminPath, hasPermission } from "@/lib/permissions";
 import { formatRelativeDate } from "@/lib/utils";
 
 type ArticlePreviewPageProps = {
@@ -18,6 +20,8 @@ type ArticlePreviewPageProps = {
 
 export default async function ArticlePreviewPage({ params }: ArticlePreviewPageProps) {
   const { id } = await params;
+  const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
   const article = await getArticleById(id);
   const previewToken = getPreviewToken();
 
@@ -32,17 +36,19 @@ export default async function ArticlePreviewPage({ params }: ArticlePreviewPageP
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="outline">
-          <Link href="/admin/articles">
+          <Link href={getDefaultAdminPath(role)}>
             <ArrowLeft className="h-4 w-4" />
-            К списку статей
+            Назад
           </Link>
         </Button>
-        <Button asChild>
-          <Link href={`/admin/articles/${article.id}/edit`}>
-            <FilePenLine className="h-4 w-4" />
-            Редактировать
-          </Link>
-        </Button>
+        {hasPermission(role, "articles:edit") ? (
+          <Button asChild>
+            <Link href={`/admin/articles/${article.id}/edit`}>
+              <FilePenLine className="h-4 w-4" />
+              Редактировать
+            </Link>
+          </Button>
+        ) : null}
         {externalPreviewHref ? (
           <Button asChild variant="secondary">
             <Link href={externalPreviewHref} target="_blank" rel="noreferrer">

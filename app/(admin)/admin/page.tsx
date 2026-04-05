@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecentActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
+import { DEFAULT_ROLE, hasPermission } from "@/lib/permissions";
 import { formatRelativeDate } from "@/lib/utils";
 import { Article } from "@/models/Article";
 
@@ -28,6 +29,7 @@ function getActivityLabel(action: string) {
 export default async function AdminDashboardPage() {
   await connectToDatabase();
   const session = await auth();
+  const role = session?.user?.role ?? DEFAULT_ROLE;
   const now = Date.now();
 
   const articles = await Article.find().sort({ updatedAt: -1 }).lean();
@@ -63,11 +65,15 @@ export default async function AdminDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/admin/articles/new">Создать материал</Link>
-            </Button>
+            {hasPermission(role, "articles:create") ? (
+              <Button asChild>
+                <Link href="/admin/articles/new">Создать материал</Link>
+              </Button>
+            ) : null}
             <Button asChild variant="outline">
-              <Link href="/admin/articles">Открыть библиотеку</Link>
+              <Link href={hasPermission(role, "articles:view") ? "/admin/articles" : "/admin/review"}>
+                {hasPermission(role, "articles:view") ? "Открыть библиотеку" : "Открыть review queue"}
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -129,9 +135,9 @@ export default async function AdminDashboardPage() {
                       {formatRelativeDate(String(article.updatedAt))}
                     </span>
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/admin/articles/${String(article._id)}/edit`}>
+                      <Link href={hasPermission(role, "articles:edit") ? `/admin/articles/${String(article._id)}/edit` : `/admin/articles/${String(article._id)}/preview`}>
                         <FilePenLine className="h-4 w-4" />
-                        Открыть
+                        {hasPermission(role, "articles:edit") ? "Открыть" : "Preview"}
                       </Link>
                     </Button>
                   </div>
@@ -160,12 +166,14 @@ export default async function AdminDashboardPage() {
               <p className="font-medium">3. Start publishing</p>
               <p className="mt-1 text-muted-foreground">После публикации статьи сразу доступны в `/api/posts` и `/api/posts/[slug]`.</p>
             </div>
-            <Button asChild className="w-full">
-              <Link href="/admin/articles/new">
-                Перейти к созданию статьи
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            {hasPermission(role, "articles:create") ? (
+              <Button asChild className="w-full">
+                <Link href="/admin/articles/new">
+                  Перейти к созданию статьи
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 

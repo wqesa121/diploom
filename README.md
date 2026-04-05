@@ -38,6 +38,7 @@ types/
 ## Возможности
 
 - защищенная админ-панель с боковой навигацией;
+- роли `admin`, `editor`, `reviewer` с route-level доступом;
 - CRUD для статей;
 - draft / published workflow;
 - scheduled publishing workflow;
@@ -52,7 +53,7 @@ types/
 
 ```bash
 npm install
-npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin"
+npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin" --role admin
 npm run dev
 ```
 
@@ -76,11 +77,13 @@ npm run dev
 1. Убедитесь, что в `.env` задана рабочая MongoDB строка.
 2. Добавьте `AUTH_SECRET`.
 3. При необходимости оставьте старый `MONGODB_URI` без изменений: приложение его поддерживает.
-4. Создайте первого администратора:
+4. Создайте первого пользователя:
 
 ```bash
-npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin"
+npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin" --role admin
 ```
+
+Допустимые роли: `admin`, `editor`, `reviewer`.
 
 5. Запустите dev-сервер:
 

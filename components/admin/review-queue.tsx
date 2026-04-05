@@ -8,11 +8,13 @@ import { ReviewNotesPanel } from "@/components/admin/review-notes-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { hasPermission, type UserRole } from "@/lib/permissions";
 import { formatRelativeDate } from "@/lib/utils";
 import type { SerializedArticle } from "@/types/article";
 
 type ReviewQueueProps = {
   articles: SerializedArticle[];
+  role: UserRole;
 };
 
 function getReviewPriority(article: SerializedArticle) {
@@ -26,7 +28,7 @@ function getReviewPriority(article: SerializedArticle) {
   };
 }
 
-export function ReviewQueue({ articles }: ReviewQueueProps) {
+export function ReviewQueue({ articles, role }: ReviewQueueProps) {
   if (!articles.length) {
     return (
       <Card>
@@ -113,12 +115,14 @@ export function ReviewQueue({ articles }: ReviewQueueProps) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <form action={updateArticleWorkflowAction.bind(null, article.id, "published")}>
-                  <Button size="sm">
-                    <Send className="h-4 w-4" />
-                    Publish now
-                  </Button>
-                </form>
+                {hasPermission(role, "articles:publish") ? (
+                  <form action={updateArticleWorkflowAction.bind(null, article.id, "published")}>
+                    <Button size="sm">
+                      <Send className="h-4 w-4" />
+                      Publish now
+                    </Button>
+                  </form>
+                ) : null}
                 <form action={updateArticleWorkflowAction.bind(null, article.id, "draft")}>
                   <Button variant="outline" size="sm">
                     <Undo2 className="h-4 w-4" />
@@ -132,9 +136,9 @@ export function ReviewQueue({ articles }: ReviewQueueProps) {
                   </Link>
                 </Button>
                 <Button asChild variant="ghost" size="sm">
-                  <Link href={`/admin/articles/${article.id}/edit`}>
+                  <Link href={hasPermission(role, "articles:edit") ? `/admin/articles/${article.id}/edit` : `/admin/articles/${article.id}/compare`}>
                     <Pencil className="h-4 w-4" />
-                    Open editor
+                    {hasPermission(role, "articles:edit") ? "Open editor" : "Open compare"}
                   </Link>
                 </Button>
               </div>

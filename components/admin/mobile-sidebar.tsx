@@ -3,10 +3,15 @@
 import { Menu } from "lucide-react";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import type { UserRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-export function MobileSidebar() {
+type MobileSidebarProps = {
+  role: UserRole;
+};
+
+export function MobileSidebar({ role }: MobileSidebarProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -16,7 +21,7 @@ export function MobileSidebar() {
         </Button>
       </SheetTrigger>
       <SheetContent className="bg-background p-3">
-        <AdminSidebar />
+        <AdminSidebar role={role} />
       </SheetContent>
     </Sheet>
   );
