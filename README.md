@@ -40,11 +40,13 @@ types/
 - защищенная админ-панель с боковой навигацией;
 - CRUD для статей;
 - draft / published workflow;
+- scheduled publishing workflow;
 - AI-генерация title, meta description, slug, markdown, tags и image query;
 - автоподбор 5-6 изображений из Unsplash;
 - публичный API `GET /api/posts` и `GET /api/posts/[slug]`;
 - rich text editor на Tiptap;
-- автоматический SEO score.
+- автоматический SEO score;
+- приватный preview по токену и webhook-friendly revalidation endpoint.
 
 ## Быстрый старт
 
@@ -65,6 +67,8 @@ npm run dev
 - поддерживаются оба ключа подключения к MongoDB: `MONGO_URI` и `MONGODB_URI`;
 - `AUTH_SECRET` обязателен для Auth.js;
 - если в старом окружении уже есть только `JWT_SECRET`, приложение умеет использовать его как fallback;
+- `PREVIEW_TOKEN` включает внешний preview draft-материалов;
+- `CRON_SECRET` защищает `POST /api/revalidate` для cron/webhook вызовов;
 - `GOOGLE_GENERATIVE_AI_API_KEY` и `UNSPLASH_ACCESS_KEY` нужны только для AI-кнопки генерации.
 
 ## Первый запуск
@@ -94,6 +98,23 @@ npm run dev
 - `/admin/articles/new` — создание статьи
 - `/api/posts` — headless API списка публикаций
 - `/api/posts/[slug]` — headless API одной публикации
+- `/preview/[slug]` — внешний preview по токену
+- `/api/revalidate` — защищённый revalidation endpoint для cron/webhook
+
+## Cron / Scheduled Publishing
+
+Если вы хотите точно обновлять публичные страницы в момент scheduled publish, вызывайте:
+
+```bash
+curl -X POST http://localhost:3000/api/revalidate \
+   -H "Authorization: Bearer YOUR_CRON_SECRET"
+```
+
+Endpoint:
+
+- проверяет `CRON_SECRET`;
+- revalidate-ит `/`, `/posts`, `/api/posts`;
+- находит уже наступившие scheduled-статьи и revalidate-ит `/posts/[slug]` и `/api/posts/[slug]`.
 
 ## Что уже реализовано
 

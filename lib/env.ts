@@ -41,3 +41,7 @@ export function getAiEnv() {
 export function getPreviewToken() {
   return process.env.PREVIEW_TOKEN?.trim() || null;
 }
+
+export function getCronSecret() {
+  return process.env.CRON_SECRET?.trim() || null;
+}
