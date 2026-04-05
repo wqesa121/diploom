@@ -10,6 +10,14 @@ type ArticleAuthorShape = {
   email?: string;
 };
 
+type ReviewNoteShape = {
+  _id?: unknown;
+  body?: string;
+  authorName?: string;
+  authorEmail?: string;
+  createdAt?: Date | string;
+};
+
 type ArticleShape = {
   _id: unknown;
   title: string;
@@ -28,6 +36,7 @@ type ArticleShape = {
   featured?: boolean;
   scheduledAt?: Date | string | null;
   seoScore?: number;
+  reviewNotes?: ReviewNoteShape[];
   createdAt: Date | string;
   updatedAt: Date | string;
 };
@@ -179,6 +188,15 @@ export function serializeArticle(article: ArticleShape): SerializedArticle {
     featured: article.featured ?? false,
     scheduledAt: article.scheduledAt ? new Date(article.scheduledAt).toISOString() : null,
     seoScore: article.seoScore ?? 0,
+    reviewNotes: (article.reviewNotes ?? [])
+      .map((note) => ({
+        id: String(note._id ?? ""),
+        body: note.body ?? "",
+        authorName: note.authorName ?? "",
+        authorEmail: note.authorEmail ?? "",
+        createdAt: note.createdAt ? new Date(note.createdAt).toISOString() : new Date(0).toISOString(),
+      }))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
     createdAt: new Date(article.createdAt).toISOString(),
     updatedAt: new Date(article.updatedAt).toISOString(),
   };

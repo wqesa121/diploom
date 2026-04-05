@@ -1,5 +1,13 @@
 export type ArticleStatus = "draft" | "in_review" | "published";
 
+export type ArticleReviewNote = {
+  id: string;
+  body: string;
+  authorName: string;
+  authorEmail: string;
+  createdAt: string;
+};
+
 export type SerializedArticle = {
   id: string;
   title: string;
@@ -22,6 +30,7 @@ export type SerializedArticle = {
   featured: boolean;
   scheduledAt: string | null;
   seoScore: number;
+  reviewNotes: ArticleReviewNote[];
   createdAt: string;
   updatedAt: string;
 };

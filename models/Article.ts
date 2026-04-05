@@ -1,5 +1,33 @@
 import { Schema, model, models, type InferSchemaType, type Types } from "mongoose";
 
+const reviewNoteSchema = new Schema(
+  {
+    body: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    authorName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    authorEmail: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    _id: true,
+  },
+);
+
 const articleSchema = new Schema(
   {
     title: {
@@ -79,6 +107,10 @@ const articleSchema = new Schema(
       default: 0,
       min: 0,
       max: 100,
+    },
+    reviewNotes: {
+      type: [reviewNoteSchema],
+      default: [],
     },
   },
   {

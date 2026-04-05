@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
 import { createArticleRevision, getArticleRevisionSnapshot } from "@/lib/revisions";
 import { estimateSeoScore } from "@/lib/utils";
-import { articleSchema } from "@/lib/validations";
+import { articleSchema, reviewNoteSchema } from "@/lib/validations";
 import { Article } from "@/models/Article";
 
 export type ArticleActionState = {
@@ -527,4 +527,63 @@ export async function toggleFeaturedArticleAction(id: string) {
   revalidatePath(`/posts/${article.slug}`);
   revalidatePath(`/api/posts/${article.slug}`);
   redirect("/admin/articles");
+}
+
+export async function addArticleReviewNoteAction(articleId: string, formData: FormData) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  const parsed = reviewNoteSchema.safeParse({
+    body: formData.get("body"),
+    redirectTo: formData.get("redirectTo") || "/admin/review",
+  });
+
+  const fallbackRedirect = String(formData.get("redirectTo") || "/admin/review");
+
+  if (!parsed.success) {
+    redirect(fallbackRedirect);
+  }
+
+  await connectToDatabase();
+
+  const article = await Article.findByIdAndUpdate(
+    articleId,
+    {
+      $push: {
+        reviewNotes: {
+          body: parsed.data.body,
+          authorName: session.user.name || "",
+          authorEmail: session.user.email || "",
+          createdAt: new Date(),
+        },
+      },
+      $set: {
+        author: session.user.id,
+      },
+    },
+    { new: true },
+  ).lean<WorkflowArticleShape | null>();
+
+  if (!article) {
+    redirect(fallbackRedirect);
+  }
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: articleId,
+    entityTitle: article.title,
+    action: "updated",
+    details: `Added review note: ${parsed.data.body.slice(0, 120)}${parsed.data.body.length > 120 ? "..." : ""}`,
+  });
+
+  revalidatePath("/admin/review");
+  revalidatePath(`/admin/articles/${articleId}/edit`);
+  revalidatePath(`/admin/articles/${articleId}/compare`);
+  redirect(parsed.data.redirectTo);
 }

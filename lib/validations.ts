@@ -49,7 +49,13 @@ export const aiGenerateSchema = z.object({
   targetAudience: z.string().optional().default(""),
 });
 
+export const reviewNoteSchema = z.object({
+  body: z.string().trim().min(10, "Заметка должна содержать минимум 10 символов").max(1000, "Заметка слишком длинная"),
+  redirectTo: z.string().trim().min(1).default("/admin/review"),
+});
+
 export type ArticleInput = z.infer<typeof articleSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type AiGenerateInput = z.infer<typeof aiGenerateSchema>;
+export type ReviewNoteInput = z.infer<typeof reviewNoteSchema>;

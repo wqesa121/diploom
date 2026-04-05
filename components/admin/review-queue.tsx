@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Clock3, Eye, Pencil, Send, ShieldAlert, Undo2 } from "lucide-react";
 
 import { updateArticleWorkflowAction } from "@/actions/article-actions";
+import { ReviewNotesPanel } from "@/components/admin/review-notes-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,6 +138,15 @@ export function ReviewQueue({ articles }: ReviewQueueProps) {
                   </Link>
                 </Button>
               </div>
+
+              <ReviewNotesPanel
+                articleId={article.id}
+                notes={article.reviewNotes}
+                redirectTo="/admin/review"
+                title="Reviewer notes"
+                description="Оставляйте контекст по доработкам, спорным местам и причинам возврата без выхода из очереди ревью."
+                compact
+              />
             </CardContent>
           </Card>
         );
