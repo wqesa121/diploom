@@ -65,6 +65,11 @@ export function ArticleRevisionList({ articleId, revisions }: ArticleRevisionLis
                 <p>Email: {revision.editorEmail || "-"}</p>
               </div>
               <div className="mt-4 flex justify-end">
+                <Button asChild type="button" variant="ghost" size="sm">
+                  <Link href={`/admin/articles/${articleId}/compare?base=${revision.id}&target=current`}>
+                    Compare with current
+                  </Link>
+                </Button>
                 <form action={restoreArticleRevisionAction.bind(null, articleId, revision.id)}>
                   <Button type="submit" variant="outline" size="sm">
                     Restore revision
