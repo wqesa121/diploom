@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Pin, Send, ShieldCheck, Trash2, Undo2 } from "lucide-react";
 
-import { bulkArticleAction, deleteArticleAction } from "@/actions/article-actions";
+import {
+  bulkArticleAction,
+  deleteArticleAction,
+  toggleFeaturedArticleAction,
+  updateArticleWorkflowAction,
+} from "@/actions/article-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -121,6 +126,46 @@ export function ArticleTable({ articles }: ArticleTableProps) {
               </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-2">
+                  {article.status === "draft" ? (
+                    <form action={updateArticleWorkflowAction.bind(null, article.id, "in_review")}>
+                      <Button variant="ghost" size="sm">
+                        <ShieldCheck className="h-4 w-4" />
+                        Review
+                      </Button>
+                    </form>
+                  ) : null}
+                  {article.status === "in_review" ? (
+                    <>
+                      <form action={updateArticleWorkflowAction.bind(null, article.id, "published")}>
+                        <Button variant="ghost" size="sm">
+                          <Send className="h-4 w-4" />
+                          Publish
+                        </Button>
+                      </form>
+                      <form action={updateArticleWorkflowAction.bind(null, article.id, "draft")}>
+                        <Button variant="ghost" size="sm">
+                          <Undo2 className="h-4 w-4" />
+                          Draft
+                        </Button>
+                      </form>
+                    </>
+                  ) : null}
+                  {article.status === "published" ? (
+                    <>
+                      <form action={toggleFeaturedArticleAction.bind(null, article.id)}>
+                        <Button variant={article.featured ? "secondary" : "ghost"} size="sm">
+                          <Pin className="h-4 w-4" />
+                          {article.featured ? "Unfeature" : "Feature"}
+                        </Button>
+                      </form>
+                      <form action={updateArticleWorkflowAction.bind(null, article.id, "in_review")}>
+                        <Button variant="ghost" size="sm">
+                          <ShieldCheck className="h-4 w-4" />
+                          Review
+                        </Button>
+                      </form>
+                    </>
+                  ) : null}
                   <Button asChild variant="secondary" size="sm">
                     <Link href={`/admin/articles/${article.id}/preview`}>
                       <Eye className="h-4 w-4" />

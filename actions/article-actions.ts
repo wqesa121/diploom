@@ -26,6 +26,25 @@ type CurrentArticleSurfaceShape = {
   slug: string;
 };
 
+type WorkflowArticleShape = {
+  _id: unknown;
+  title: string;
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  excerpt: string;
+  content: Record<string, unknown>;
+  markdown: string;
+  tags?: string[];
+  featuredImage?: string;
+  additionalImages?: string[];
+  imageQuery?: string;
+  status: "draft" | "in_review" | "published";
+  featured?: boolean;
+  scheduledAt?: Date | string | null;
+  seoScore?: number;
+};
+
 type RevisionArticleShape = {
   _id: unknown;
   title: string;
@@ -399,4 +418,113 @@ export async function restoreArticleRevisionAction(articleId: string, revisionId
   revalidatePath(`/posts/${revision.slug}`);
   revalidatePath(`/api/posts/${revision.slug}`);
   redirect(`/admin/articles/${articleId}/edit`);
+}
+
+export async function updateArticleWorkflowAction(id: string, nextStatus: "draft" | "in_review" | "published") {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  await connectToDatabase();
+
+  const article = await Article.findById(id).lean<WorkflowArticleShape | null>();
+
+  if (!article) {
+    redirect("/admin/articles");
+  }
+
+  const nextFeatured = nextStatus === "published" ? article.featured ?? false : false;
+
+  await Article.findByIdAndUpdate(id, {
+    status: nextStatus,
+    featured: nextFeatured,
+    author: session.user.id,
+  });
+
+  const updatedArticle = await Article.findById(id).lean<RevisionArticleShape | null>();
+
+  if (updatedArticle) {
+    await createArticleRevision({
+      article: updatedArticle,
+      editorId: session.user.id,
+      editorName: session.user.name,
+      editorEmail: session.user.email,
+    });
+  }
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: id,
+    entityTitle: article.title,
+    action: "updated",
+    details: `Status changed to ${nextStatus} via inline action.`,
+  });
+
+  revalidateArticleSurfaces();
+  revalidatePath(`/admin/articles/${id}/edit`);
+  revalidatePath(`/admin/articles/${id}/preview`);
+  revalidatePath(`/posts/${article.slug}`);
+  revalidatePath(`/api/posts/${article.slug}`);
+  redirect("/admin/articles");
+}
+
+export async function toggleFeaturedArticleAction(id: string) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  await connectToDatabase();
+
+  const article = await Article.findById(id).lean<WorkflowArticleShape | null>();
+
+  if (!article || article.status !== "published") {
+    redirect("/admin/articles");
+  }
+
+  const nextFeatured = !(article.featured ?? false);
+
+  if (nextFeatured) {
+    await Article.updateMany({ _id: { $ne: id }, featured: true }, { $set: { featured: false } });
+  }
+
+  await Article.findByIdAndUpdate(id, {
+    featured: nextFeatured,
+    author: session.user.id,
+  });
+
+  const updatedArticle = await Article.findById(id).lean<RevisionArticleShape | null>();
+
+  if (updatedArticle) {
+    await createArticleRevision({
+      article: updatedArticle,
+      editorId: session.user.id,
+      editorName: session.user.name,
+      editorEmail: session.user.email,
+    });
+  }
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: id,
+    entityTitle: article.title,
+    action: "updated",
+    details: nextFeatured ? "Marked as featured via inline action." : "Removed featured flag via inline action.",
+  });
+
+  revalidateArticleSurfaces();
+  revalidatePath(`/admin/articles/${id}/edit`);
+  revalidatePath(`/admin/articles/${id}/preview`);
+  revalidatePath(`/posts/${article.slug}`);
+  revalidatePath(`/api/posts/${article.slug}`);
+  redirect("/admin/articles");
 }
