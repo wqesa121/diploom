@@ -64,6 +64,11 @@ const articleSchema = new Schema(
       default: "draft",
       index: true,
     },
+    featured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     scheduledAt: {
       type: Date,
       default: null,

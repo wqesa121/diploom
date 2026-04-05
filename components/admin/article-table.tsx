@@ -43,6 +43,7 @@ export function ArticleTable({ articles }: ArticleTableProps) {
             <TableCell>
               <div className="flex flex-wrap gap-2">
                 <Badge variant={article.status === "published" ? "default" : "secondary"}>{article.status}</Badge>
+                {article.featured ? <Badge>featured</Badge> : null}
                 {article.status === "published" && article.scheduledAt && new Date(article.scheduledAt).getTime() > now ? (
                   <Badge variant="outline">scheduled</Badge>
                 ) : null}

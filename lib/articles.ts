@@ -25,6 +25,7 @@ type ArticleShape = {
   imageQuery?: string;
   author?: ArticleAuthorShape;
   status: "draft" | "published";
+  featured?: boolean;
   scheduledAt?: Date | string | null;
   seoScore?: number;
   createdAt: Date | string;
@@ -66,6 +67,17 @@ export async function getPublishedArticleBySlug(slug: string) {
   const article = await Article.findOne({ slug, status: "published", ...buildLiveArticleFilters() })
     .populate("author", "name email")
     .lean();
+  return article ? serializeArticle(article as unknown as ArticleShape) : null;
+}
+
+export async function getFeaturedPublishedArticle() {
+  await connectToDatabase();
+
+  const article = await Article.findOne({ status: "published", featured: true, ...buildLiveArticleFilters() })
+    .populate("author", "name email")
+    .sort({ updatedAt: -1 })
+    .lean();
+
   return article ? serializeArticle(article as unknown as ArticleShape) : null;
 }
 
@@ -164,6 +176,7 @@ export function serializeArticle(article: ArticleShape): SerializedArticle {
       email: article.author?.email ?? "",
     },
     status: article.status,
+    featured: article.featured ?? false,
     scheduledAt: article.scheduledAt ? new Date(article.scheduledAt).toISOString() : null,
     seoScore: article.seoScore ?? 0,
     createdAt: new Date(article.createdAt).toISOString(),

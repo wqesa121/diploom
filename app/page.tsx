@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPublishedArticles } from "@/lib/articles";
+import { getFeaturedPublishedArticle, getPublishedArticles } from "@/lib/articles";
 import { formatRelativeDate } from "@/lib/utils";
 
 const features = [
@@ -29,11 +29,13 @@ const features = [
 
 export default async function HomePage() {
   const session = await auth();
-  const { data: latestPosts } = await getPublishedArticles({ page: 1, limit: 3 });
-  const featuredPost = latestPosts[0] ?? null;
-  const supportingPosts = latestPosts.slice(1);
-  const uniqueTags = Array.from(new Set(latestPosts.flatMap((post) => post.tags))).slice(0, 6);
-  const uniqueAuthors = Array.from(new Set(latestPosts.map((post) => post.author.name))).length;
+  const featuredPost = await getFeaturedPublishedArticle();
+  const { data: latestPosts } = await getPublishedArticles({ page: 1, limit: 4 });
+  const editorialPosts = featuredPost ? latestPosts.filter((post) => post.id !== featuredPost.id) : latestPosts;
+  const supportingPosts = editorialPosts.slice(0, 2);
+  const metricsPosts = featuredPost ? [featuredPost, ...editorialPosts] : latestPosts;
+  const uniqueTags = Array.from(new Set(metricsPosts.flatMap((post) => post.tags))).slice(0, 6);
+  const uniqueAuthors = Array.from(new Set(metricsPosts.map((post) => post.author.name))).length;
 
   return (
     <main className="container space-y-16 py-10 md:py-16">
@@ -55,7 +57,7 @@ export default async function HomePage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-[1.5rem] border border-primary/10 bg-white/85 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Live posts</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950">{latestPosts.length}</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">{metricsPosts.length}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Публикации уже выводятся на главную и в public feed.</p>
               </div>
               <div className="rounded-[1.5rem] border border-primary/10 bg-white/85 p-4">
@@ -96,7 +98,7 @@ export default async function HomePage() {
                 ) : null}
                 <CardContent className="relative space-y-5 p-6 pt-6">
                   <div className="flex flex-wrap gap-2">
-                    <Badge className="border-white/10 bg-white/10 text-white hover:bg-white/10">Featured story</Badge>
+                    <Badge className="border-white/10 bg-white/10 text-white hover:bg-white/10">Editor&apos;s pick</Badge>
                     {featuredPost.tags.slice(0, 2).map((tag) => (
                       <Badge key={tag} className="border-white/10 bg-white/5 text-white/90">
                         {tag}
@@ -266,7 +268,7 @@ export default async function HomePage() {
             ) : null}
 
             <div className="grid gap-5">
-              {(supportingPosts.length ? supportingPosts : latestPosts).map((post) => (
+              {(supportingPosts.length ? supportingPosts : editorialPosts).map((post) => (
               <Card key={post.id} className="overflow-hidden border-white/70 bg-white/85">
                 {post.featuredImage ? (
                   <div className="relative aspect-[4/3] bg-secondary">

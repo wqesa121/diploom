@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Newspaper, Search, Sparkles, TrendingUp } from "
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPublishedArticles } from "@/lib/articles";
+import { getFeaturedPublishedArticle, getPublishedArticles } from "@/lib/articles";
 import { formatRelativeDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -44,9 +44,11 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
     tag,
   });
 
-  const featuredArticle = data[0] ?? null;
-  const secondaryArticles = data.slice(1, 5);
-  const gridArticles = data.slice(5);
+  const editorPickedArticle = !search && !tag && page === 1 ? await getFeaturedPublishedArticle() : null;
+  const editorialData = editorPickedArticle ? data.filter((article) => article.id !== editorPickedArticle.id) : data;
+  const featuredArticle = editorPickedArticle ?? data[0] ?? null;
+  const secondaryArticles = editorPickedArticle ? editorialData.slice(0, 4) : data.slice(1, 5);
+  const gridArticles = editorPickedArticle ? editorialData.slice(4) : data.slice(5);
   const availableTags = Array.from(new Set(data.flatMap((article) => article.tags))).slice(0, 12);
 
   return (
@@ -182,7 +184,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                 <div className="flex flex-col justify-between p-6 md:p-8">
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
-                      <Badge>Lead story</Badge>
+                      <Badge>{featuredArticle.featured ? "Editor&apos;s pick" : "Lead story"}</Badge>
                       {featuredArticle.tags.slice(0, 3).map((item) => (
                         <Badge key={item} variant="outline">
                           {item}

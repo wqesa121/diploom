@@ -44,6 +44,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
   const [additionalImagesInput, setAdditionalImagesInput] = useState(initialData?.additionalImages.join(", ") ?? "");
   const [imageQuery, setImageQuery] = useState(initialData?.imageQuery ?? "");
   const [status, setStatus] = useState<"draft" | "published">(initialData?.status ?? "draft");
+  const [featured, setFeatured] = useState(initialData?.featured ?? false);
   const [scheduledAt, setScheduledAt] = useState(initialData?.scheduledAt ? new Date(initialData.scheduledAt).toISOString().slice(0, 16) : "");
   const [topic, setTopic] = useState(initialData?.title ?? "");
   const [keywords, setKeywords] = useState(initialData?.tags.join(", ") ?? "");
@@ -112,6 +113,7 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
         <input type="hidden" name="additionalImages" value={additionalImagesInput} />
         <input type="hidden" name="featuredImage" value={featuredImage} />
         <input type="hidden" name="imageQuery" value={imageQuery} />
+        <input type="hidden" name="featured" value={featured ? "true" : "false"} />
         <input type="hidden" name="scheduledAt" value={scheduledAt} />
 
         <Card>
@@ -167,6 +169,27 @@ export function ArticleForm({ mode, initialData, action }: ArticleFormProps) {
                 <p className="text-xs text-muted-foreground">
                   Если указан будущий момент времени и статус = Published, статья появится на публичных страницах только после этой даты.
                 </p>
+              </div>
+              <div className="space-y-3 md:col-span-2 rounded-[1.25rem] border bg-secondary/30 p-4">
+                <div className="space-y-1">
+                  <Label htmlFor="featuredToggle">Editor-picked featured story</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Помеченный материал будет приоритетным lead story на публичных страницах. При выборе нового featured-флага предыдущий featured материал будет снят автоматически.
+                  </p>
+                </div>
+                <label htmlFor="featuredToggle" className="flex items-center justify-between gap-4 rounded-[1rem] border bg-white px-4 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-950">Использовать как featured content</p>
+                    <p className="text-xs text-muted-foreground">Работает как editor-picked hero для home и posts index.</p>
+                  </div>
+                  <input
+                    id="featuredToggle"
+                    type="checkbox"
+                    checked={featured}
+                    onChange={(event) => setFeatured(event.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                </label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="metaTitle">Meta Title</Label>

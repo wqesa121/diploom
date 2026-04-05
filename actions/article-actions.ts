@@ -42,6 +42,7 @@ function parseArticle(formData: FormData) {
     additionalImages: normalizeArray(formData, "additionalImages"),
     imageQuery: formData.get("imageQuery") || "",
     status: formData.get("status"),
+    featured: formData.get("featured") || "false",
     scheduledAt: formData.get("scheduledAt") || "",
   });
 }
@@ -74,6 +75,10 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     tags: parsed.data.tags,
   });
 
+  if (parsed.data.featured) {
+    await Article.updateMany({ featured: true }, { $set: { featured: false } });
+  }
+
   const article = await Article.create({
     ...parsed.data,
     content,
@@ -90,7 +95,7 @@ export async function createArticleAction(_: ArticleActionState, formData: FormD
     entityId: String(article._id),
     entityTitle: parsed.data.title,
     action: "created",
-    details: parsed.data.status === "published" ? "Article created as published." : "Article created as draft.",
+    details: `${parsed.data.status === "published" ? "Article created as published." : "Article created as draft."}${parsed.data.featured ? " Marked as featured." : ""}`,
   });
 
   revalidatePath("/admin");
@@ -131,6 +136,10 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
     tags: parsed.data.tags,
   });
 
+  if (parsed.data.featured) {
+    await Article.updateMany({ _id: { $ne: id }, featured: true }, { $set: { featured: false } });
+  }
+
   await Article.findByIdAndUpdate(id, {
     ...parsed.data,
     content,
@@ -148,8 +157,8 @@ export async function updateArticleAction(id: string, _: ArticleActionState, for
     entityTitle: parsed.data.title,
     action: "updated",
     details: parsed.data.scheduledAt
-      ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.`
-      : `Status: ${parsed.data.status}.`,
+      ? `Status: ${parsed.data.status}. Scheduled for ${new Date(parsed.data.scheduledAt).toLocaleString("ru-RU")}.${parsed.data.featured ? " Featured enabled." : ""}`
+      : `Status: ${parsed.data.status}.${parsed.data.featured ? " Featured enabled." : ""}`,
   });
 
   revalidatePath("/admin");
