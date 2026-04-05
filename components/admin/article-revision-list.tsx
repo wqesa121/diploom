@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GitBranch, History, Sparkles } from "lucide-react";
 
+import { restoreArticleRevisionAction } from "@/actions/article-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,13 @@ export function ArticleRevisionList({ articleId, revisions }: ArticleRevisionLis
                 <p>SEO score: {revision.seoScore}/100</p>
                 <p>Scheduled: {revision.scheduledAt ? new Date(revision.scheduledAt).toLocaleString("ru-RU") : "not set"}</p>
                 <p>Email: {revision.editorEmail || "-"}</p>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <form action={restoreArticleRevisionAction.bind(null, articleId, revision.id)}>
+                  <Button type="submit" variant="outline" size="sm">
+                    Restore revision
+                  </Button>
+                </form>
               </div>
             </div>
           ))

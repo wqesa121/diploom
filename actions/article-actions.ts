@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { logActivity } from "@/lib/activity";
 import { connectToDatabase } from "@/lib/db";
-import { createArticleRevision } from "@/lib/revisions";
+import { createArticleRevision, getArticleRevisionSnapshot } from "@/lib/revisions";
 import { estimateSeoScore } from "@/lib/utils";
 import { articleSchema } from "@/lib/validations";
 import { Article } from "@/models/Article";
@@ -20,6 +20,10 @@ type DeletedArticleShape = {
   title: string;
   slug: string;
   featured?: boolean;
+};
+
+type CurrentArticleSurfaceShape = {
+  slug: string;
 };
 
 type RevisionArticleShape = {
@@ -316,4 +320,83 @@ export async function bulkArticleAction(formData: FormData) {
 
   revalidateArticleSurfaces();
   redirect("/admin/articles");
+}
+
+export async function restoreArticleRevisionAction(articleId: string, revisionId: string) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  await connectToDatabase();
+
+  const [revision, currentArticle] = await Promise.all([
+    getArticleRevisionSnapshot(revisionId),
+    Article.findById(articleId).select("slug").lean<CurrentArticleSurfaceShape | null>(),
+  ]);
+
+  if (!revision || revision.articleId !== articleId) {
+    throw new Error("Revision not found");
+  }
+
+  const normalizedFeatured = revision.status === "published" ? revision.featured : false;
+
+  if (normalizedFeatured) {
+    await Article.updateMany({ _id: { $ne: articleId }, featured: true }, { $set: { featured: false } });
+  }
+
+  await Article.findByIdAndUpdate(articleId, {
+    title: revision.title,
+    slug: revision.slug,
+    metaTitle: revision.metaTitle,
+    metaDescription: revision.metaDescription,
+    excerpt: revision.excerpt,
+    content: revision.content,
+    markdown: revision.markdown,
+    tags: revision.tags,
+    featuredImage: revision.featuredImage,
+    additionalImages: revision.additionalImages,
+    imageQuery: revision.imageQuery,
+    status: revision.status,
+    featured: normalizedFeatured,
+    scheduledAt: revision.scheduledAt ? new Date(revision.scheduledAt) : null,
+    seoScore: revision.seoScore,
+    author: session.user.id,
+  });
+
+  const restoredArticle = await Article.findById(articleId).lean<RevisionArticleShape | null>();
+
+  if (restoredArticle) {
+    await createArticleRevision({
+      article: restoredArticle,
+      editorId: session.user.id,
+      editorName: session.user.name,
+      editorEmail: session.user.email,
+    });
+  }
+
+  await logActivity({
+    actorId: session.user.id,
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    entityType: "article",
+    entityId: articleId,
+    entityTitle: revision.title,
+    action: "updated",
+    details: `Restored article from revision v${revision.revision}.`,
+  });
+
+  revalidateArticleSurfaces();
+  revalidatePath(`/admin/articles/${articleId}/edit`);
+  revalidatePath(`/admin/articles/${articleId}/preview`);
+
+  if (currentArticle?.slug) {
+    revalidatePath(`/posts/${currentArticle.slug}`);
+    revalidatePath(`/api/posts/${currentArticle.slug}`);
+  }
+
+  revalidatePath(`/posts/${revision.slug}`);
+  revalidatePath(`/api/posts/${revision.slug}`);
+  redirect(`/admin/articles/${articleId}/edit`);
 }

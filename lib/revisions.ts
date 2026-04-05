@@ -28,6 +28,14 @@ type CreateArticleRevisionParams = {
   editorEmail?: string | null;
 };
 
+type StoredRevisionShape = RevisionSnapshot & {
+  articleId: unknown;
+  revision: number;
+  editorName?: string;
+  editorEmail?: string;
+  createdAt: Date | string;
+};
+
 export async function createArticleRevision(params: CreateArticleRevisionParams) {
   const articleId = String(params.article._id);
   const latestRevision = await ArticleRevision.findOne({ articleId }).sort({ revision: -1 }).select("revision").lean<{ revision?: number } | null>();
@@ -78,4 +86,40 @@ export async function getArticleRevisions(articleId: string, limit = 8) {
     scheduledAt: revision.scheduledAt ? new Date(revision.scheduledAt).toISOString() : null,
     createdAt: new Date(revision.createdAt).toISOString(),
   }));
+}
+
+export async function getArticleRevisionSnapshot(revisionId: string) {
+  if (!Types.ObjectId.isValid(revisionId)) {
+    return null;
+  }
+
+  const revision = await ArticleRevision.findById(revisionId).lean<StoredRevisionShape | null>();
+
+  if (!revision) {
+    return null;
+  }
+
+  return {
+    id: String(revision._id),
+    articleId: String(revision.articleId),
+    revision: revision.revision,
+    title: revision.title,
+    slug: revision.slug,
+    metaTitle: revision.metaTitle,
+    metaDescription: revision.metaDescription,
+    excerpt: revision.excerpt,
+    content: revision.content as Record<string, unknown>,
+    markdown: revision.markdown,
+    tags: revision.tags ?? [],
+    featuredImage: revision.featuredImage ?? "",
+    additionalImages: revision.additionalImages ?? [],
+    imageQuery: revision.imageQuery ?? "",
+    status: revision.status,
+    featured: revision.featured ?? false,
+    scheduledAt: revision.scheduledAt ? new Date(revision.scheduledAt).toISOString() : null,
+    seoScore: revision.seoScore ?? 0,
+    editorName: revision.editorName || revision.editorEmail || "Unknown user",
+    editorEmail: revision.editorEmail || "",
+    createdAt: new Date(revision.createdAt).toISOString(),
+  };
 }
