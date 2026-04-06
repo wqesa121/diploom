@@ -105,8 +105,24 @@ npm run dev
 - `/admin/articles/new` — создание статьи
 - `/api/posts` — headless API списка публикаций
 - `/api/posts/[slug]` — headless API одной публикации
+- `/api/health` — health/readiness check приложения и MongoDB
 - `/preview/[slug]` — внешний preview по токену
 - `/api/revalidate` — защищённый revalidation endpoint для cron/webhook
+
+## Monitoring
+
+Для liveness/readiness probe используйте:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+Endpoint:
+
+- возвращает `200`, если приложение и MongoDB доступны;
+- возвращает `503`, если база не отвечает или приложение не готово обслуживать трафик;
+- поддерживает `HEAD` для дешёвых health probes;
+- отдаёт timestamp, uptime и latency проверки базы.
 
 ## Cron / Scheduled Publishing
 
