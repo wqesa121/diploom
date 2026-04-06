@@ -45,3 +45,22 @@ export function getPreviewToken() {
 export function getCronSecret() {
   return process.env.CRON_SECRET?.trim() || null;
 }
+
+function parsePositiveNumber(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function getAiRateLimitConfig() {
+  return {
+    limit: parsePositiveNumber(process.env.AI_RATE_LIMIT_MAX, 10),
+    windowSeconds: parsePositiveNumber(process.env.AI_RATE_LIMIT_WINDOW_SECONDS, 3600),
+  };
+}
+
+export function getRevalidateRateLimitConfig() {
+  return {
+    limit: parsePositiveNumber(process.env.REVALIDATE_RATE_LIMIT_MAX, 30),
+    windowSeconds: parsePositiveNumber(process.env.REVALIDATE_RATE_LIMIT_WINDOW_SECONDS, 60),
+  };
+}

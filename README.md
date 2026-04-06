@@ -71,6 +71,8 @@ npm run dev
 - если в старом окружении уже есть только `JWT_SECRET`, приложение умеет использовать его как fallback;
 - `PREVIEW_TOKEN` включает внешний preview draft-материалов;
 - `CRON_SECRET` защищает `POST /api/revalidate` для cron/webhook вызовов;
+- `AI_RATE_LIMIT_MAX` и `AI_RATE_LIMIT_WINDOW_SECONDS` ограничивают Generate with AI по окну времени;
+- `REVALIDATE_RATE_LIMIT_MAX` и `REVALIDATE_RATE_LIMIT_WINDOW_SECONDS` ограничивают частоту вызовов `POST /api/revalidate`;
 - `GOOGLE_GENERATIVE_AI_API_KEY` и `UNSPLASH_ACCESS_KEY` нужны только для AI-кнопки генерации.
 
 ## Первый запуск
@@ -118,6 +120,7 @@ curl -X POST http://localhost:3000/api/revalidate \
 Endpoint:
 
 - проверяет `CRON_SECRET`;
+- ограничивает частоту вызовов и возвращает `429` + `Retry-After`, если лимит превышен;
 - revalidate-ит `/`, `/posts`, `/api/posts`;
 - находит уже наступившие scheduled-статьи и revalidate-ит `/posts/[slug]` и `/api/posts/[slug]`.
 

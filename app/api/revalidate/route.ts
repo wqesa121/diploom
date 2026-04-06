@@ -2,7 +2,8 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { connectToDatabase } from "@/lib/db";
-import { getCronSecret } from "@/lib/env";
+import { getCronSecret, getRevalidateRateLimitConfig } from "@/lib/env";
+import { enforceRateLimit, getRequestRateLimitKey } from "@/lib/rate-limit";
 import { Article } from "@/models/Article";
 
 type RevalidateRequestBody = {
@@ -42,6 +43,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rateLimitConfig = getRevalidateRateLimitConfig();
+  const rateLimit = await enforceRateLimit({
+    route: "revalidate-endpoint",
+    key: getRequestRateLimitKey(request, "revalidate"),
+    limit: rateLimitConfig.limit,
+    windowMs: rateLimitConfig.windowSeconds * 1000,
+  });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Rate limit exceeded",
+        retryAfter: rateLimit.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Reset": rateLimit.resetAt,
+        },
+      },
+    );
+  }
+
   const revalidatedPaths = new Set<string>(["/", "/posts", "/api/posts"]);
 
   if (body?.slug?.trim()) {
@@ -74,5 +100,10 @@ export async function POST(request: Request) {
     scheduledSlugs: dueScheduledArticles.map((article) => article.slug),
     paths: Array.from(revalidatedPaths),
     triggeredAt: new Date().toISOString(),
+  }, {
+    headers: {
+      "X-RateLimit-Remaining": String(rateLimit.remaining),
+      "X-RateLimit-Reset": rateLimit.resetAt,
+    },
   });
 }
