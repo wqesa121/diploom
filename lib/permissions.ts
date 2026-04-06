@@ -2,6 +2,8 @@ export type UserRole = "admin" | "editor" | "reviewer";
 
 export type AdminPermission =
   | "dashboard:view"
+  | "users:view"
+  | "users:manage"
   | "articles:view"
   | "articles:create"
   | "articles:edit"
@@ -19,6 +21,8 @@ export const DEFAULT_ROLE: UserRole = "editor";
 const rolePermissions: Record<UserRole, AdminPermission[]> = {
   admin: [
     "dashboard:view",
+    "users:view",
+    "users:manage",
     "articles:view",
     "articles:create",
     "articles:edit",
@@ -80,6 +84,10 @@ export function canAccessAdminPath(pathname: string, role: UserRole) {
 
   if (pathname === "/admin/account") {
     return hasPermission(role, "account:view");
+  }
+
+  if (pathname === "/admin/users") {
+    return hasPermission(role, "users:view");
   }
 
   if (pathname === "/admin/review") {

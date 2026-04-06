@@ -20,7 +20,7 @@ const activityLogSchema = new Schema(
     },
     entityType: {
       type: String,
-      enum: ["article", "account"],
+      enum: ["article", "account", "user"],
       required: true,
       index: true,
     },

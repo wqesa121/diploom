@@ -54,8 +54,21 @@ export const reviewNoteSchema = z.object({
   redirectTo: z.string().trim().min(1).default("/admin/review"),
 });
 
+export const createUserSchema = z.object({
+  name: z.string().trim().min(2, "Имя должно содержать минимум 2 символа").max(80, "Имя слишком длинное"),
+  email: z.string().trim().email("Введите корректный email"),
+  password: z.string().min(8, "Пароль должен содержать минимум 8 символов").max(128, "Пароль слишком длинный"),
+  role: z.enum(["admin", "editor", "reviewer"]),
+});
+
+export const updateUserRoleSchema = z.object({
+  role: z.enum(["admin", "editor", "reviewer"]),
+});
+
 export type ArticleInput = z.infer<typeof articleSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type AiGenerateInput = z.infer<typeof aiGenerateSchema>;
 export type ReviewNoteInput = z.infer<typeof reviewNoteSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;

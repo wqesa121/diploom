@@ -4,7 +4,7 @@ type LogActivityParams = {
   actorId?: string;
   actorName?: string | null;
   actorEmail?: string | null;
-  entityType: "article" | "account";
+  entityType: "article" | "account" | "user";
   entityId?: string;
   entityTitle?: string;
   action: "created" | "updated" | "deleted" | "password_changed";

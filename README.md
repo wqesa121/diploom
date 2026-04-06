@@ -39,6 +39,7 @@ types/
 
 - защищенная админ-панель с боковой навигацией;
 - роли `admin`, `editor`, `reviewer` с route-level доступом;
+- admin-only экран управления пользователями и ролями;
 - CRUD для статей;
 - draft / published workflow;
 - scheduled publishing workflow;
@@ -97,6 +98,7 @@ npm run dev
 
 - `/login` — вход в админку
 - `/admin` — dashboard
+- `/admin/users` — управление пользователями и ролями
 - `/admin/articles` — список статей
 - `/admin/articles/new` — создание статьи
 - `/api/posts` — headless API списка публикаций
