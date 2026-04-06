@@ -56,6 +56,7 @@ types/
 npm install
 npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin" --role admin
 npm run test:smoke
+npm run verify:release
 npm run dev
 ```
 
@@ -111,6 +112,16 @@ npm run test:smoke
 - route access rules и workflow guards;
 - env fallback/override для rate limiting;
 - request key extraction для API limiter.
+
+## Operations
+
+Предрелизная команда:
+
+```bash
+npm run verify:release
+```
+
+Полный operational runbook с backup/recovery находится в `OPERATIONS.md`.
 
 ## Основные маршруты
 

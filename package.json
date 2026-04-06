@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "seed:admin": "tsx scripts/seed-admin.ts",
-    "test:smoke": "tsx --test tests/**/*.test.ts"
+    "test:smoke": "tsx --test tests/**/*.test.ts",
+    "verify:release": "tsx scripts/release-check.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.7.0",
