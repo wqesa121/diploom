@@ -55,6 +55,7 @@ types/
 ```bash
 npm install
 npm run seed:admin -- --email admin@example.com --password StrongPass123! --name "Admin" --role admin
+npm run test:smoke
 npm run dev
 ```
 
@@ -95,6 +96,21 @@ npm run dev
 ```
 
 6. Откройте `/login` и войдите под созданным аккаунтом.
+
+## Smoke Tests
+
+Быстрый автоматизированный контур можно запускать так:
+
+```bash
+npm run test:smoke
+```
+
+Сейчас он покрывает:
+
+- permission matrix для `admin`, `editor`, `reviewer`;
+- route access rules и workflow guards;
+- env fallback/override для rate limiting;
+- request key extraction для API limiter.
 
 ## Основные маршруты
 
