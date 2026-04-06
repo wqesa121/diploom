@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getAiRateLimitConfig, getOptionalAppName, getRevalidateRateLimitConfig } from "../lib/env";
+import { getAiRateLimitConfig, getMonitoringWebhookUrl, getOptionalAppName, getRevalidateRateLimitConfig } from "../lib/env";
 import { getRequestRateLimitKey } from "../lib/rate-limit";
 
 test("rate limit config falls back to safe defaults", () => {
@@ -44,6 +44,15 @@ test("app name fallback stays stable", () => {
   process.env.NEXT_PUBLIC_APP_NAME = "Studio CMS";
   assert.equal(getOptionalAppName(), "Studio CMS");
   process.env.NEXT_PUBLIC_APP_NAME = previousAppName;
+});
+
+test("monitoring webhook env stays optional", () => {
+  const previousWebhook = process.env.MONITORING_WEBHOOK_URL;
+  delete process.env.MONITORING_WEBHOOK_URL;
+  assert.equal(getMonitoringWebhookUrl(), null);
+  process.env.MONITORING_WEBHOOK_URL = "https://hooks.example.test/monitoring";
+  assert.equal(getMonitoringWebhookUrl(), "https://hooks.example.test/monitoring");
+  process.env.MONITORING_WEBHOOK_URL = previousWebhook;
 });
 
 test("request rate limit key prefers forwarded ip and falls back predictably", () => {

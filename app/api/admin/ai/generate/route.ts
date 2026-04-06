@@ -3,14 +3,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { generateArticleWithAI } from "@/lib/ai";
 import { getAiRateLimitConfig } from "@/lib/env";
+import { createRequestId, reportMonitoringEvent } from "@/lib/monitoring";
 import { enforceRateLimit, getRequestRateLimitKey } from "@/lib/rate-limit";
 import { aiGenerateSchema } from "@/lib/validations";
 
 export async function POST(request: Request) {
+  const requestId = createRequestId();
   const session = await auth();
 
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", requestId }, { status: 401, headers: { "X-Request-Id": requestId } });
   }
 
   const rateLimitConfig = getAiRateLimitConfig();
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
       {
         error: "Rate limit exceeded",
         retryAfter: rateLimit.retryAfterSeconds,
+        requestId,
       },
       {
         status: 429,
@@ -33,6 +36,7 @@ export async function POST(request: Request) {
           "Retry-After": String(rateLimit.retryAfterSeconds),
           "X-RateLimit-Remaining": String(rateLimit.remaining),
           "X-RateLimit-Reset": rateLimit.resetAt,
+          "X-Request-Id": requestId,
         },
       },
     );
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
   const parsed = aiGenerateSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid request", requestId }, { status: 400, headers: { "X-Request-Id": requestId } });
   }
 
   try {
@@ -51,10 +55,22 @@ export async function POST(request: Request) {
       headers: {
         "X-RateLimit-Remaining": String(rateLimit.remaining),
         "X-RateLimit-Reset": rateLimit.resetAt,
+        "X-Request-Id": requestId,
       },
     });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to generate article" }, { status: 500 });
+    await reportMonitoringEvent({
+      source: "api/admin/ai/generate",
+      requestId,
+      severity: "error",
+      message: "AI article generation failed",
+      metadata: {
+        userId: session.user.id || null,
+        userEmail: session.user.email || null,
+      },
+      error,
+    });
+
+    return NextResponse.json({ error: "Failed to generate article", requestId }, { status: 500, headers: { "X-Request-Id": requestId } });
   }
 }

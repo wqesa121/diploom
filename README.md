@@ -75,6 +75,7 @@ npm run dev
 - `CRON_SECRET` защищает `POST /api/revalidate` для cron/webhook вызовов;
 - `AI_RATE_LIMIT_MAX` и `AI_RATE_LIMIT_WINDOW_SECONDS` ограничивают Generate with AI по окну времени;
 - `REVALIDATE_RATE_LIMIT_MAX` и `REVALIDATE_RATE_LIMIT_WINDOW_SECONDS` ограничивают частоту вызовов `POST /api/revalidate`;
+- `MONITORING_WEBHOOK_URL` позволяет отправлять critical/error события во внешний webhook;
 - `GOOGLE_GENERATIVE_AI_API_KEY` и `UNSPLASH_ACCESS_KEY` нужны только для AI-кнопки генерации.
 
 ## Первый запуск
@@ -149,7 +150,18 @@ Endpoint:
 - возвращает `200`, если приложение и MongoDB доступны;
 - возвращает `503`, если база не отвечает или приложение не готово обслуживать трафик;
 - поддерживает `HEAD` для дешёвых health probes;
-- отдаёт timestamp, uptime и latency проверки базы.
+- отдаёт timestamp, uptime и latency проверки базы;
+- добавляет `X-Request-Id` для корреляции логов.
+
+## Monitoring Alerts
+
+Для базового alerting можно задать:
+
+```bash
+MONITORING_WEBHOOK_URL=https://your-alert-endpoint.example/webhook
+```
+
+Тогда критичные и error-level события из ключевых API route будут отправляться во внешний webhook со структурированным payload и `requestId`.
 
 ## Cron / Scheduled Publishing
 

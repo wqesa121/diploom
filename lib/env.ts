@@ -64,3 +64,7 @@ export function getRevalidateRateLimitConfig() {
     windowSeconds: parsePositiveNumber(process.env.REVALIDATE_RATE_LIMIT_WINDOW_SECONDS, 60),
   };
 }
+
+export function getMonitoringWebhookUrl() {
+  return process.env.MONITORING_WEBHOOK_URL?.trim() || null;
+}

@@ -96,6 +96,8 @@ npm run verify:release
 - сетевые allowlists Atlas;
 - не истёк ли секрет или пароль БД.
 
+Если настроен `MONITORING_WEBHOOK_URL`, сверяйте `requestId` из health/API ответов с алертами webhook-потока.
+
 ### Symptom: AI generation returns 429
 
 Проверьте:
@@ -104,6 +106,8 @@ npm run verify:release
 - `AI_RATE_LIMIT_WINDOW_SECONDS`
 - не идёт ли аномальный burst запросов из admin panel.
 
+Если AI generation возвращает `500`, используйте `requestId` из ответа и найдите соответствующее событие в monitoring webhook.
+
 ### Symptom: revalidate endpoint returns 429
 
 Проверьте:
@@ -111,6 +115,8 @@ npm run verify:release
 - cron frequency;
 - `REVALIDATE_RATE_LIMIT_MAX`
 - `REVALIDATE_RATE_LIMIT_WINDOW_SECONDS`
+
+Если endpoint возвращает `500`, используйте `requestId` для поиска critical alert по `api/revalidate`.
 
 ### Symptom: users cannot log in
 

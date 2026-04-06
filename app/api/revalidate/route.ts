@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { connectToDatabase } from "@/lib/db";
 import { getCronSecret, getRevalidateRateLimitConfig } from "@/lib/env";
+import { createRequestId, reportMonitoringEvent } from "@/lib/monitoring";
 import { enforceRateLimit, getRequestRateLimitKey } from "@/lib/rate-limit";
 import { Article } from "@/models/Article";
 
@@ -23,10 +24,18 @@ function getProvidedSecret(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const requestId = createRequestId();
   const cronSecret = getCronSecret();
 
   if (!cronSecret) {
-    return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
+    await reportMonitoringEvent({
+      source: "api/revalidate",
+      requestId,
+      severity: "critical",
+      message: "CRON_SECRET is not configured",
+    });
+
+    return NextResponse.json({ error: "CRON_SECRET is not configured", requestId }, { status: 500, headers: { "X-Request-Id": requestId } });
   }
 
   let body: RevalidateRequestBody | undefined;
@@ -40,7 +49,7 @@ export async function POST(request: Request) {
   const providedSecret = getProvidedSecret(request);
 
   if (!providedSecret || providedSecret !== cronSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", requestId }, { status: 401, headers: { "X-Request-Id": requestId } });
   }
 
   const rateLimitConfig = getRevalidateRateLimitConfig();
@@ -56,6 +65,7 @@ export async function POST(request: Request) {
       {
         error: "Rate limit exceeded",
         retryAfter: rateLimit.retryAfterSeconds,
+        requestId,
       },
       {
         status: 429,
@@ -63,6 +73,7 @@ export async function POST(request: Request) {
           "Retry-After": String(rateLimit.retryAfterSeconds),
           "X-RateLimit-Remaining": String(rateLimit.remaining),
           "X-RateLimit-Reset": rateLimit.resetAt,
+          "X-Request-Id": requestId,
         },
       },
     );
@@ -76,34 +87,51 @@ export async function POST(request: Request) {
     revalidatedPaths.add(`/api/posts/${slug}`);
   }
 
-  await connectToDatabase();
+  try {
+    await connectToDatabase();
 
-  const dueScheduledArticles = await Article.find({
-    status: "published",
-    scheduledAt: { $ne: null, $lte: new Date() },
-  })
-    .select("slug scheduledAt")
-    .lean<Array<{ slug: string; scheduledAt: Date }>>();
+    const dueScheduledArticles = await Article.find({
+      status: "published",
+      scheduledAt: { $ne: null, $lte: new Date() },
+    })
+      .select("slug scheduledAt")
+      .lean<Array<{ slug: string; scheduledAt: Date }>>();
 
-  for (const article of dueScheduledArticles) {
-    revalidatedPaths.add(`/posts/${article.slug}`);
-    revalidatedPaths.add(`/api/posts/${article.slug}`);
+    for (const article of dueScheduledArticles) {
+      revalidatedPaths.add(`/posts/${article.slug}`);
+      revalidatedPaths.add(`/api/posts/${article.slug}`);
+    }
+
+    for (const path of revalidatedPaths) {
+      revalidatePath(path);
+    }
+
+    return NextResponse.json({
+      revalidated: true,
+      scheduledCount: dueScheduledArticles.length,
+      scheduledSlugs: dueScheduledArticles.map((article) => article.slug),
+      paths: Array.from(revalidatedPaths),
+      triggeredAt: new Date().toISOString(),
+      requestId,
+    }, {
+      headers: {
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+        "X-RateLimit-Reset": rateLimit.resetAt,
+        "X-Request-Id": requestId,
+      },
+    });
+  } catch (error) {
+    await reportMonitoringEvent({
+      source: "api/revalidate",
+      requestId,
+      severity: "critical",
+      message: "Revalidation request failed",
+      metadata: {
+        hasSlug: Boolean(body?.slug?.trim()),
+      },
+      error,
+    });
+
+    return NextResponse.json({ error: "Failed to revalidate content", requestId }, { status: 500, headers: { "X-Request-Id": requestId } });
   }
-
-  for (const path of revalidatedPaths) {
-    revalidatePath(path);
-  }
-
-  return NextResponse.json({
-    revalidated: true,
-    scheduledCount: dueScheduledArticles.length,
-    scheduledSlugs: dueScheduledArticles.map((article) => article.slug),
-    paths: Array.from(revalidatedPaths),
-    triggeredAt: new Date().toISOString(),
-  }, {
-    headers: {
-      "X-RateLimit-Remaining": String(rateLimit.remaining),
-      "X-RateLimit-Reset": rateLimit.resetAt,
-    },
-  });
 }
